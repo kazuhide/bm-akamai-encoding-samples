@@ -1,0 +1,1 @@
+# bm-akamai-encoding-samples
