@@ -1,0 +1,8 @@
+# JetBrain
+**/.idea/
+
+# General
+.DS_Store
+
+# Test scripts
+**/test_*
