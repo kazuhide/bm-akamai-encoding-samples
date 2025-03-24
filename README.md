@@ -32,6 +32,11 @@
 - **Per-Titleエンコーディング（H.264/AAC、fMP4形式、HLSおよびDASH）**
   - `create_vod_pertitle_h264_aac_fmp4_hls_dash.py`
 
+- **H.264/AAC + DRM (CENC CBC)（fMP4形式、HLSおよびDASH）**
+  - Widevine、PlayReady、FairPlayの複数DRMに対応
+  - Amazon S3入力とAkamai NetStorage出力: `create_vod_h264_aac_fmp4_drm_cbc_with_hls_dash_s3_in_netstorage_out.py`
+  - Linode Object Storage入出力: `create_vod_h264_aac_fmp4_drm_cbc_with_hls_dash_linote_object_storage_in_out.py`
+
 ### Live（ライブ配信）
 
 ライブ配信で使用可能な以下のサンプルスクリプトが含まれています。
