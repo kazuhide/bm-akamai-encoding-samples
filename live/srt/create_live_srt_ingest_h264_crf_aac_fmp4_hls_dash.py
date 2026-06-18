@@ -3,7 +3,7 @@ from time import sleep
 
 from bitmovin_api_sdk import BitmovinApi, BitmovinError
 from bitmovin_api_sdk import S3AccessStyle, S3SignatureVersion, GenericS3Output, SrtInput, SrtMode
-from bitmovin_api_sdk import Encoding, CloudRegion
+from bitmovin_api_sdk import Encoding, CloudRegion, EncodingMode
 from bitmovin_api_sdk import EncodingOutput, AclEntry, AclPermission
 from bitmovin_api_sdk import PresetConfiguration
 from bitmovin_api_sdk import Stream, StreamInput, MuxingStream, StreamMode, ColorConfig
@@ -17,7 +17,7 @@ from bitmovin_api_sdk import MessageType, StartLiveEncodingRequest, ManifestGene
 from bitmovin_api_sdk import LiveHlsManifest, LiveDashManifest, AvailabilityStartTimeMode
 from bitmovin_api_sdk import Status
 
-TEST_ITEM = "live-srt-ingest-h264-vbr-aac-fmp4-hls-dash"
+TEST_ITEM = "live-srt-ingest-h264-crf-aac-fmp4-hls-dash"
 
 API_KEY = '<INSERT YOUR API KEY>'
 ORG_ID = '<INSERT YOUR ORG ID>'
@@ -33,12 +33,12 @@ bitmovin_api = BitmovinApi(api_key=API_KEY, tenant_org_id=ORG_ID)
 
 # Example H.264 encoding profiles, including different resolutions, bitrates, and profiles.
 video_encoding_profiles = [
-    dict(height=240, bitrate=300000, profile=ProfileH264.HIGH, level=None, mode=StreamMode.STANDARD),
-    dict(height=360, bitrate=800000, profile=ProfileH264.HIGH, level=None, mode=StreamMode.STANDARD),
-    dict(height=480, bitrate=1200000, profile=ProfileH264.HIGH, level=None, mode=StreamMode.STANDARD),
-    dict(height=540, bitrate=2000000, profile=ProfileH264.HIGH, level=None, mode=StreamMode.STANDARD),
-    dict(height=720, bitrate=4000000, profile=ProfileH264.HIGH, level=None, mode=StreamMode.STANDARD),
-    dict(height=1080, bitrate=6000000, profile=ProfileH264.HIGH, level=LevelH264.L4, mode=StreamMode.STANDARD)
+    dict(height=240, crf=22, bitrate=300000, profile=ProfileH264.HIGH, level=None, mode=StreamMode.STANDARD),
+    dict(height=360, crf=22, bitrate=800000, profile=ProfileH264.HIGH, level=None, mode=StreamMode.STANDARD),
+    dict(height=480, crf=22, bitrate=1200000, profile=ProfileH264.HIGH, level=None, mode=StreamMode.STANDARD),
+    dict(height=540, crf=22, bitrate=2000000, profile=ProfileH264.HIGH, level=None, mode=StreamMode.STANDARD),
+    dict(height=720, crf=22, bitrate=4000000, profile=ProfileH264.HIGH, level=None, mode=StreamMode.STANDARD),
+    dict(height=1080, crf=22, bitrate=6000000, profile=ProfileH264.HIGH, level=LevelH264.L4, mode=StreamMode.STANDARD)
 ]
 
 # Example AAC audio encoding profiles, each with a specified bitrate and sample rate.
@@ -67,7 +67,7 @@ def main():
             ssl=True,
             port=443,
             signature_version=S3SignatureVersion.V4,
-            name='Test Linote Object Storage Output'))
+            name='Test Linode Object Storage Output'))
 
     # === Encoding instance definition ===
     encoding = bitmovin_api.encoding.encodings.create(
@@ -118,8 +118,8 @@ def main():
             h264_video_configuration=H264VideoConfiguration(
                 name='Sample video codec configuration',
                 height=video_profile.get("height"),
-                bitrate=video_profile.get("bitrate"),
-                max_bitrate=int(video_profile.get("bitrate") * 1.2),
+                crf=video_profile.get("crf"),
+                max_bitrate=video_profile.get("bitrate"),
                 bufsize=int(video_profile.get("bitrate") * 1.5),
                 profile=video_profile.get("profile"),
                 level=video_profile.get("level"),
@@ -131,7 +131,8 @@ def main():
                 cabac=use_cabac,
                 adaptive_spatial_transform=adaptive_spatial_transform,
                 weighted_prediction_p_frames=weighted_prediction_p_frames,
-                preset_configuration=PresetConfiguration.LIVE_ULTRAHIGH_QUALITY
+                preset_configuration=PresetConfiguration.LIVE_ULTRAHIGH_QUALITY,
+                encoding_mode=EncodingMode.SINGLE_PASS
             )
         )
 

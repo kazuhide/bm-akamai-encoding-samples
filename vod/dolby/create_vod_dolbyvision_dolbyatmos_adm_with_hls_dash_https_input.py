@@ -17,7 +17,7 @@ from bitmovin_api_sdk import HlsManifest, HlsVersion, AudioMediaInfo, StreamInfo
 from bitmovin_api_sdk import MessageType, StartEncodingRequest, ManifestResource, ManifestGenerator
 from bitmovin_api_sdk import Status
 
-TEST_ITEM = "dolbyvision-dolbyatmos-damf-hls-dash-fmp4-https-input"
+TEST_ITEM = "vod-dolbyvision-dolbyatmos-adm-hls-dash-fmp4-https-input"
 
 API_KEY = '<INSERT YOUR API KEY>'
 ORG_ID = '<INSERT YOUR ORG ID>'
@@ -26,7 +26,7 @@ ORG_ID = '<INSERT YOUR ORG ID>'
 HTTPS_INPUT_HOST = 'apac-inputs.s3.ap-southeast-1.amazonaws.com'
 DOLBY_VISION_INPUT_PATH = "netflix-opencontent/SolLevante/dolbyvision/sollevante_j2k.mxf"
 DOLBY_VISION_INPUT_METADATA = "netflix-opencontent/SolLevante/dolbyvision/sollevante_j2k_sidecar.xml"
-DOLBY_ATMOS_DAMF_PATH = 'netflix-opencontent/SolLevante/atmos-damf/sollevante_lp_v01_DAMF_Nearfield_48k_24b_24/sollevante_lp_v01_DAMF_Nearfield_48k_24b_24.atmos'
+DOLBY_ATMOS_ADM_PATH = 'netflix-opencontent/SolLevante/atmos-adm/sollevante_lp_v01_DAMF_Nearfield_48k_24b_24.wav'
 
 LINODE_OBJECT_STORAGE_OUTPUT_ACCESS_KEY = '<INSERT_YOUR_ACCESS_KEY>'
 LINODE_OBJECT_STORAGE_OUTPUT_SECRET_KEY = '<INSERT_YOUR_SECRET_KEY>'
@@ -63,12 +63,12 @@ def main():
             ssl=True,
             port=443,
             signature_version=S3SignatureVersion.V4,
-            name='Test Linote Object Storage Output'))
+            name='Test Linode Object Storage Output'))
 
     # === Encoding definition ===
     encoding = bitmovin_api.encoding.encodings.create(
         encoding=Encoding(
-            name=f"[{TEST_ITEM}] DolbyVision / DolbyAtmos (DAMF)",
+            name=f"[{TEST_ITEM}] DolbyVision / DolbyAtmos (ADM)",
             cloud_region=CloudRegion.AKAMAI_JP_OSA,
             encoder_version='STABLE'))
 
@@ -84,8 +84,8 @@ def main():
         encoding_id=encoding.id,
         dolby_atmos_ingest_input_stream=DolbyAtmosIngestInputStream(
             input_id=https_input.id,
-            input_path=DOLBY_ATMOS_DAMF_PATH,
-            input_format=DolbyAtmosInputFormat.DAMF))
+            input_path=DOLBY_ATMOS_ADM_PATH,
+            input_format=DolbyAtmosInputFormat.ADM))
     video_input_stream = StreamInput(input_stream_id=video_ingest_input_stream.id)
     audio_input_stream = StreamInput(input_stream_id=audio_ingest_input_stream.id)
 

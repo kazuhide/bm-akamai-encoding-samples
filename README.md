@@ -1,75 +1,45 @@
 # bm-akamai-encoding-samples
 
-本リポジトリは、Bitmovinエンコーダーを利用して Akamai Connected Cloud 上でビデオコンテンツをエンコードおよび配信するためのサンプルスクリプトを集めたものです。サンプルはVOD（オンデマンド動画）およびLive
-（ライブ配信）の両方のユースケースを対象としており、多様なフォーマットとエンコード設定を含んでいます。
+本リポジトリは、Bitmovin Encoder を利用して **Akamai Connected Cloud**（リージョン `AKAMAI_JP_OSA`）上でビデオコンテンツをエンコードおよび配信するためのサンプルスクリプト（Python）を集めたものです。VOD（オンデマンド）と Live（ライブ配信）の双方を対象とし、多様なコーデック・コンテナ・パッケージング・DRM の設定例を含みます。
 
 ## 構成
 
-### VOD (Video On Demand)
+サンプルは用途（VOD / Live）と機能ごとにディレクトリを分けています。各ディレクトリの README に、サンプルの一覧・特記事項・利用方法をまとめています。
 
-以下のフォーマットでエンコードするサンプルが含まれています。
+### VOD（オンデマンド）
 
-- **H.264/AAC（fMP4形式、HLSおよびDASH）**
-  - `create_vod_h264_aac_fmp4_hls_dash.py`
-
-- **H.265/AAC（fMP4形式、HLSおよびDASH）**
-  - `create_vod_h265_aac_fmp4_hls_dash.py`
-
-- **VP9/WebM（AAC、fMP4形式、DASH）**
-  - `create_vod_vp9_webm_aac_fmp4_dash.py`
-
-- **H.264/AAC（TSおよびfMP4形式、HLSおよびDASH）**
-  - `create_vod_h264_aac_ts_fmp4_hls_dash.py`
-
-- **Dolby VisionおよびDolby Atmos（ADMおよびDAMF形式）**
-  - HTTPS入力からのエンコードに対応
-  - `create_vod_dolbyvision_dolbyatmos_adm_with_hls_dash_https_input.py`
-  - `create_vod_dolbyvision_dolbyatmos_damf_with_hls_dash_https_input.py`
-
-- **AV1/AAC（fMP4形式、HLSおよびDASH）**
-  - `create_vod_av1_aac_fmp4_hls_dash.py`
-
-- **Per-Titleエンコーディング（H.264/AAC、fMP4形式、HLSおよびDASH）**
-  - `create_vod_pertitle_h264_aac_fmp4_hls_dash.py`
-
-- **H.264/AAC + DRM (CENC CBC)（fMP4形式、HLSおよびDASH）**
-  - Widevine、PlayReady、FairPlayの複数DRMに対応
-  - Amazon S3入力とAkamai NetStorage出力: `create_vod_h264_aac_fmp4_drm_cbc_with_hls_dash_s3_in_netstorage_out.py`
-  - Linode Object Storage入出力: `create_vod_h264_aac_fmp4_drm_cbc_with_hls_dash_linote_object_storage_in_out.py`
+- [`vod/abr`](vod/abr/) — 固定 ABR ラダーの基本サンプル（H.264 / H.265 / AV1 / VP9 / TS）
+- [`vod/pertitle`](vod/pertitle/) — Per-Title エンコーディング
+- [`vod/drm`](vod/drm/) — DRM（CENC CBC、Widevine / PlayReady / FairPlay）
+- [`vod/dolby`](vod/dolby/) — Dolby Vision + Dolby Atmos（ADM / DAMF）
 
 ### Live（ライブ配信）
 
-ライブ配信で使用可能な以下のサンプルスクリプトが含まれています。
-
-- **RTMPインジェスト（H.264、CRFおよびVBRエンコーディング、AAC、fMP4形式、HLSおよびDASH）**
-  - `create_live_rtmp_ingest_h264_crf_aac_fmp4_hls_dash.py`
-  - `create_live_rtmp_ingest_h264_vbr_aac_fmp4_hls_dash.py`
-
-- **SRTインジェスト（AV1、H.265、H.264の各種エンコーディング設定、AAC、fMP4形式、HLSおよびDASH）**
-  - `create_live_srt_ingest_av1_vbr_aac_fmp4_hls_dash.py`
-  - `create_live_srt_ingest_hevc_vbr_aac_fmp4_hls_dash.py`
-  - `create_live_srt_ingest_h264_crf_aac_fmp4_hls_dash.py`
-  - `create_live_srt_ingest_hevc_crf_aac_fmp4_hls_dash.py`
-  - `create_live_srt_ingest_h264_vbr_aac_fmp4_hls_dash.py`
+- [`live/rtmp`](live/rtmp/) — RTMP インジェスト（H.264、CRF / VBR）
+- [`live/srt`](live/srt/) — SRT インジェスト（H.264 / H.265 / AV1、CRF / VBR）
 
 ## 使用方法
 
 ### システム条件
-Python 2.7 もしくは Python 3.4 - 3.11 推奨
 
-### セットアップ方法
-pip コマンドを利用し、Python 用の Bitmovin SDK を取得します。Bitmovin エンコーダーに新しい機能が追加され、API に新しいエンドポイントやパラメータが追加された場合、SDK を更新しないと機能が利用できない場合があります。詳細な API の追加機能についてはリリースノートを参照ください。（https://bitmovin.com/docs/encoding/changelogs/rest)
+- Python 3.8 以降（本リポジトリは Python 3.13 で動作確認しています）
 
-以下のいずれかの方法でSDKをインストールしてください。
+### セットアップ
+
+Python 用の Bitmovin SDK を取得します。Bitmovin Encoder に新機能が追加され API に新しいエンドポイントやパラメータが追加された場合、SDK を更新しないと利用できないことがあります（[リリースノート](https://bitmovin.com/docs/encoding/changelogs/rest)）。
+
+以下のいずれかの方法でセットアップします。
 
 ```sh
-pip install bitmovin-api-sdk-python
+# pip を利用する場合
+pip install bitmovin-api-sdk
+# または
+pip install -r requirements.txt
 ```
 
-または
-
 ```sh
-pip install -r requirements.txt
+# uv を利用する場合（pyproject.toml / uv.lock で固定された依存を使用）
+uv sync
 ```
 
 有効な Bitmovin API key および Organization ID をスクリプトに設定します。API key は Bitmovin アカウントごとに発行され、スクリプトを実行すると Organization ID に紐づくサブスクリプションプランを消費してエンコードを行います。
@@ -79,26 +49,27 @@ API_KEY = '<INSERT YOUR API KEY>'
 ORG_ID = '<INSERT YOUR ORG ID>'
 ```
 
-入出力ファイルが保存されている場所にアクセスするための情報、入力ファイルパス、出力先パスを指定します。Akamai Compute Cloud を利用した入出力設定はスクリプト内に用意されているため、各入出力にアクセスするために必要な情報を設定します。設定が必要なパラメータはスクリプトごとに異なる場合があるため、詳細はスクリプト内の記述をご確認ください。
+入出力ファイルへアクセスするための情報、入力ファイルパス、出力先パスを設定します。利用するバックエンド（Linode Object Storage / AWS S3 / Akamai NetStorage / HTTPS 入力）はサンプルにより異なります。設定が必要なパラメータの詳細は各スクリプトおよび各ディレクトリの README をご確認ください。
 
 ```python
+# 例: Linode Object Storage（Generic S3 互換）を入出力に使う場合
 LINODE_OBJECT_STORAGE_INPUT_ACCESS_KEY = '<INSERT_YOUR_ACCESS_KEY>'
 LINODE_OBJECT_STORAGE_INPUT_SECRET_KEY = '<INSERT_YOUR_SECRET_KEY>'
 LINODE_OBJECT_STORAGE_INPUT_BUCKET_NAME = '<INSERT_YOUR_BUCKET_NAME>'
 LINODE_OBJECT_STORAGE_INPUT_HOST_NAME = '<INSERT_YOUR_INPUT_HOST_NAME>'
 
 INPUT_PATH = '/path/to/your/input/file.mp4'
-# e.g. 'inputs/big_buck_bunny_1080p_h264.mov'
 
 LINODE_OBJECT_STORAGE_OUTPUT_ACCESS_KEY = '<INSERT_YOUR_ACCESS_KEY>'
 LINODE_OBJECT_STORAGE_OUTPUT_SECRET_KEY = '<INSERT_YOUR_SECRET_KEY>'
 LINODE_OBJECT_STORAGE_OUTPUT_BUCKET_NAME = '<INSERT_YOUR_BUCKET_NAME>'
-LINODE_OBJECT_STORAGE_OUTPUT_HOST_NAME = '<INSERT_YOUR_INPUT_HOST_NAME>'
-
-OUTPUT_BASE_PATH = f'output/path/to/this/job/'
+LINODE_OBJECT_STORAGE_OUTPUT_HOST_NAME = '<INSERT_YOUR_OUTPUT_HOST_NAME>'
 ```
+
+> DRM サンプルでは、スクリプト冒頭の DRM 鍵はテスト用のプレースホルダ値です。本番環境では必ずご自身の値に差し替えてください。詳細は [`vod/drm`](vod/drm/) を参照してください。
 
 ---
 
-詳細は各スクリプト内のコメントおよび公式ドキュメントをご参照ください。
+詳細は各ディレクトリの README および各スクリプト内のコメント、[Bitmovin 公式ドキュメント](https://bitmovin.com/docs/encoding)をご参照ください。
 
+なお、本リポジトリは Bitmovin 公式のサンプル実装ではありません。一実装例として参照ください。

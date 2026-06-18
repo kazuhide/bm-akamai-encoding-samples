@@ -5,10 +5,10 @@ from bitmovin_api_sdk import BitmovinApi, BitmovinError
 from bitmovin_api_sdk import S3AccessStyle, S3SignatureVersion, GenericS3Output, SrtInput, SrtMode
 from bitmovin_api_sdk import Encoding, CloudRegion
 from bitmovin_api_sdk import EncodingOutput, AclEntry, AclPermission
-from bitmovin_api_sdk import PresetConfiguration, EncodingMode
+from bitmovin_api_sdk import PresetConfiguration
 from bitmovin_api_sdk import Stream, StreamInput, MuxingStream, StreamMode, ColorConfig
 from bitmovin_api_sdk import AacAudioConfiguration, AacChannelLayout
-from bitmovin_api_sdk import H265VideoConfiguration, CodecConfigType, ProfileH265
+from bitmovin_api_sdk import H264VideoConfiguration, CodecConfigType, ProfileH264, LevelH264, WeightedPredictionPFrames
 from bitmovin_api_sdk import Fmp4Muxing
 from bitmovin_api_sdk import HlsManifest, HlsVersion, AudioMediaInfo, StreamInfo
 from bitmovin_api_sdk import DashManifest, Period, VideoAdaptationSet, AudioAdaptationSet
@@ -17,7 +17,7 @@ from bitmovin_api_sdk import MessageType, StartLiveEncodingRequest, ManifestGene
 from bitmovin_api_sdk import LiveHlsManifest, LiveDashManifest, AvailabilityStartTimeMode
 from bitmovin_api_sdk import Status
 
-TEST_ITEM = "live-srt-ingest-hevc-crf-aac-fmp4-hls-dash"
+TEST_ITEM = "live-srt-ingest-h264-vbr-aac-fmp4-hls-dash"
 
 API_KEY = '<INSERT YOUR API KEY>'
 ORG_ID = '<INSERT YOUR ORG ID>'
@@ -31,14 +31,14 @@ OUTPUT_BASE_PATH = f'output/{TEST_ITEM}/'
 
 bitmovin_api = BitmovinApi(api_key=API_KEY, tenant_org_id=ORG_ID)
 
-# Example H.265 encoding profiles, including different resolutions, bitrate, and profiles.
+# Example H.264 encoding profiles, including different resolutions, bitrates, and profiles.
 video_encoding_profiles = [
-    dict(height=240, crf=21, bitrate=240000, profile=ProfileH265.MAIN, level=None, mode=StreamMode.STANDARD),
-    dict(height=360, crf=21, bitrate=640000, profile=ProfileH265.MAIN, level=None, mode=StreamMode.STANDARD),
-    dict(height=480, crf=21, bitrate=960000, profile=ProfileH265.MAIN, level=None, mode=StreamMode.STANDARD),
-    dict(height=540, crf=21, bitrate=1600000, profile=ProfileH265.MAIN, level=None, mode=StreamMode.STANDARD),
-    dict(height=720, crf=21, bitrate=3200000, profile=ProfileH265.MAIN, level=None, mode=StreamMode.STANDARD),
-    dict(height=1080, crf=21, bitrate=4800000, profile=ProfileH265.MAIN, level=None, mode=StreamMode.STANDARD)
+    dict(height=240, bitrate=300000, profile=ProfileH264.HIGH, level=None, mode=StreamMode.STANDARD),
+    dict(height=360, bitrate=800000, profile=ProfileH264.HIGH, level=None, mode=StreamMode.STANDARD),
+    dict(height=480, bitrate=1200000, profile=ProfileH264.HIGH, level=None, mode=StreamMode.STANDARD),
+    dict(height=540, bitrate=2000000, profile=ProfileH264.HIGH, level=None, mode=StreamMode.STANDARD),
+    dict(height=720, bitrate=4000000, profile=ProfileH264.HIGH, level=None, mode=StreamMode.STANDARD),
+    dict(height=1080, bitrate=6000000, profile=ProfileH264.HIGH, level=LevelH264.L4, mode=StreamMode.STANDARD)
 ]
 
 # Example AAC audio encoding profiles, each with a specified bitrate and sample rate.
@@ -57,7 +57,7 @@ def main():
             port=2088
         )
     )
-    soutput = bitmovin_api.encoding.outputs.generic_s3.create(
+    output = bitmovin_api.encoding.outputs.generic_s3.create(
         generic_s3_output=GenericS3Output(
             access_key=LINODE_OBJECT_STORAGE_OUTPUT_ACCESS_KEY,
             secret_key=LINODE_OBJECT_STORAGE_OUTPUT_SECRET_KEY,
@@ -67,7 +67,7 @@ def main():
             ssl=True,
             port=443,
             signature_version=S3SignatureVersion.V4,
-            name='Test Linote Object Storage Output'))
+            name='Test Linode Object Storage Output'))
 
     # === Encoding instance definition ===
     encoding = bitmovin_api.encoding.encodings.create(
@@ -81,7 +81,7 @@ def main():
     # === Video Profile definition ===
     for video_profile in video_encoding_profiles:
         """
-        Loop through each defined H.265 profile.
+        Loop through each defined H.264 profile.
         Create a color configuration that automatically copies color flags from the source.
         If the profile is HIGH, we enable certain advanced features like CABAC.
         If MAIN or BASELINE were used, you could set different values here.
@@ -91,43 +91,67 @@ def main():
             copy_color_transfer_flag=True,
             copy_color_space_flag=True
         )
-        # Create Video Codec Configuration with advanced H.265 parameters
-        h265_codec = bitmovin_api.encoding.configurations.video.h265.create(
-            h265_video_configuration=H265VideoConfiguration(
-                name='Sample H.265 Video Configuration',
+
+        if video_profile.get("profile") == ProfileH264.HIGH:
+            adaptive_spatial_transform = True
+            use_cabac = True
+            num_refframe = 4
+            num_bframe = 3
+            weighted_prediction_p_frames = WeightedPredictionPFrames.SMART
+        elif video_profile.get("profile") == ProfileH264.MAIN:
+            adaptive_spatial_transform = False
+            use_cabac = True
+            num_refframe = 4
+            num_bframe = 3
+            weighted_prediction_p_frames = WeightedPredictionPFrames.SMART
+        elif video_profile.get("profile") == ProfileH264.BASELINE:
+            adaptive_spatial_transform = False
+            use_cabac = False
+            num_refframe = 4
+            num_bframe = 0
+            weighted_prediction_p_frames = WeightedPredictionPFrames.DISABLED
+        else:
+            raise Exception("Unknown profile. Please specify a valid H.264 profile (HIGH, MAIN, or BASELINE).")
+
+        # Create Video Codec Configuration with advanced H.264 parameters
+        h264_codec = bitmovin_api.encoding.configurations.video.h264.create(
+            h264_video_configuration=H264VideoConfiguration(
+                name='Sample video codec configuration',
                 height=video_profile.get("height"),
-                crf=video_profile.get("crf"),
-                max_bitrate=video_profile.get("bitrate"),
+                bitrate=video_profile.get("bitrate"),
+                max_bitrate=int(video_profile.get("bitrate") * 1.2),
                 bufsize=int(video_profile.get("bitrate") * 1.5),
                 profile=video_profile.get("profile"),
                 level=video_profile.get("level"),
-                ref_frames=4,
-                bframes=3,
                 min_keyframe_interval=2,
                 max_keyframe_interval=2,
                 color_config=color_config,
-                preset_configuration=PresetConfiguration.LIVE_HIGH_QUALITY,
-                encoding_mode=EncodingMode.SINGLE_PASS
+                ref_frames=num_refframe,
+                bframes=num_bframe,
+                cabac=use_cabac,
+                adaptive_spatial_transform=adaptive_spatial_transform,
+                weighted_prediction_p_frames=weighted_prediction_p_frames,
+                preset_configuration=PresetConfiguration.LIVE_ULTRAHIGH_QUALITY
             )
         )
 
-        # Create a Stream that uses the above H.265 codec configuration
-        h265_stream = bitmovin_api.encoding.encodings.streams.create(
+        # Create a Stream that uses the above H.264 codec configuration
+        h264_stream = bitmovin_api.encoding.encodings.streams.create(
             encoding_id=encoding.id,
             stream=Stream(
-                codec_config_id=h265_codec.id,
+                codec_config_id=h264_codec.id,
                 input_streams=[StreamInput(
                     input_id=srt_input.id,
                     input_path="live",
                     position=0)],
-                name=f"Stream H265 {video_profile.get('height')}p",
+                name=f"Stream H264 {video_profile.get('height')}p",
                 mode=video_profile.get('mode')
             )
         )
 
         # Define the S3 output path for the final video segments
         video_muxing_output = EncodingOutput(
-            output_id=soutput.id,
+            output_id=output.id,
             output_path=f"{OUTPUT_BASE_PATH}video/{video_profile.get('height')}p",
             acl=[AclEntry(permission=AclPermission.PUBLIC_READ)]
         )
@@ -139,7 +163,7 @@ def main():
                 segment_length=6,
                 segment_naming='segment_%number%.m4s',
                 init_segment_name='init.mp4',
-                streams=[MuxingStream(stream_id=h265_stream.id)],
+                streams=[MuxingStream(stream_id=h264_stream.id)],
                 outputs=[video_muxing_output],
                 name=f"Video FMP4 Muxing {video_profile.get('height')}p"
             )
@@ -178,7 +202,7 @@ def main():
 
         # Define the GCS output path for audio segments
         audio_muxing_output = EncodingOutput(
-            output_id=soutput.id,
+            output_id=output.id,
             output_path=f"{OUTPUT_BASE_PATH}audio/{audio_profile.get('bitrate')}",
             acl=[AclEntry(permission=AclPermission.PUBLIC_READ)]
         )
@@ -197,8 +221,8 @@ def main():
         )
 
     # Define HLS and DASH manifests
-    hls_manifest = _create_hls_manifest(encoding_id=encoding.id, output=soutput, output_path=OUTPUT_BASE_PATH)
-    dash_manifest = _create_dash_manifest(encoding_id=encoding.id, output=soutput, output_path=OUTPUT_BASE_PATH)
+    hls_manifest = _create_hls_manifest(encoding_id=encoding.id, output=output, output_path=OUTPUT_BASE_PATH)
+    dash_manifest = _create_dash_manifest(encoding_id=encoding.id, output=output, output_path=OUTPUT_BASE_PATH)
 
     live_hls_manifest = LiveHlsManifest(
         manifest_id=hls_manifest.id,
@@ -321,7 +345,7 @@ def _create_hls_manifest(encoding_id, output, output_path):
         if 'PER_TITLE_TEMPLATE' in stream.mode.value:
             continue
 
-        # Identify if the muxing belongs to an AAC (audio) or H.265 (video) stream
+        # Identify if the muxing belongs to an AAC (audio) or H.264 (video) stream
         codec = bitmovin_api.encoding.configurations.type.get(configuration_id=stream.codec_config_id)
 
         # Build the relative segment path for the manifest
@@ -343,9 +367,9 @@ def _create_hls_manifest(encoding_id, output, output_path):
                     muxing_id=muxing.id,
                     uri=f'audio_{audio_codec.bitrate}.m3u8'))
 
-        elif codec.type == CodecConfigType.H265:
+        elif codec.type == CodecConfigType.H264:
             # Build an HLS video stream
-            video_codec = bitmovin_api.encoding.configurations.video.h265.get(configuration_id=stream.codec_config_id)
+            video_codec = bitmovin_api.encoding.configurations.video.h264.get(configuration_id=stream.codec_config_id)
             bitmovin_api.encoding.manifests.hls.streams.create(
                 manifest_id=hls_manifest.id,
                 stream_info=StreamInfo(
@@ -408,7 +432,7 @@ def _create_dash_manifest(encoding_id, output, output_path):
         if 'PER_TITLE_TEMPLATE' in stream.mode.value:
             continue
 
-        # Identify if the muxing is for an AAC or H.265 stream
+        # Identify if the muxing is for an AAC or H.264 stream
         codec = bitmovin_api.encoding.configurations.type.get(configuration_id=stream.codec_config_id)
         segment_path = _remove_output_base_path(muxing.outputs[0].output_path)
 
@@ -425,7 +449,7 @@ def _create_dash_manifest(encoding_id, output, output_path):
                     mode=DashRepresentationTypeMode.TEMPLATE_REPRESENTATION,
                     segment_path=segment_path))
 
-        elif codec.type == CodecConfigType.H265:
+        elif codec.type == CodecConfigType.H264:
             # Attach this muxing to the video adaptation set
             bitmovin_api.encoding.manifests.dash.periods.adaptationsets.representations.fmp4.create(
                 manifest_id=dash_manifest.id,
@@ -526,7 +550,7 @@ def _remove_output_base_path(text):
     Remove the OUTPUT_BASE_PATH prefix from the given path.
     Used for constructing relative segment paths for HLS/DASH manifests.
 
-    :param text: The full path (e.g., 'output/h265-aac-fmp4-hls-dash/video/720p')
+    :param text: The full path (e.g., 'output/h264-aac-fmp4-hls-dash/video/720p')
     :return: Relative path without the OUTPUT_BASE_PATH prefix
     """
     if text.startswith(OUTPUT_BASE_PATH):
