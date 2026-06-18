@@ -5,7 +5,7 @@ from bitmovin_api_sdk import BitmovinApi, BitmovinError
 from bitmovin_api_sdk import S3AccessStyle, S3SignatureVersion, GenericS3Output, SrtInput, SrtMode
 from bitmovin_api_sdk import Encoding, CloudRegion
 from bitmovin_api_sdk import EncodingOutput, AclEntry, AclPermission
-from bitmovin_api_sdk import PresetConfiguration
+from bitmovin_api_sdk import PresetConfiguration, EncodingMode
 from bitmovin_api_sdk import Stream, StreamInput, MuxingStream, StreamMode, ColorConfig
 from bitmovin_api_sdk import AacAudioConfiguration, AacChannelLayout
 from bitmovin_api_sdk import H265VideoConfiguration, CodecConfigType, ProfileH265
@@ -17,7 +17,7 @@ from bitmovin_api_sdk import MessageType, StartLiveEncodingRequest, ManifestGene
 from bitmovin_api_sdk import LiveHlsManifest, LiveDashManifest, AvailabilityStartTimeMode
 from bitmovin_api_sdk import Status
 
-TEST_ITEM = "live-srt-ingest-hevc-vbr-aac-fmp4-hls-dash"
+TEST_ITEM = "live-srt-ingest-hevc-crf-aac-fmp4-hls-dash"
 
 API_KEY = '<INSERT YOUR API KEY>'
 ORG_ID = '<INSERT YOUR ORG ID>'
@@ -33,12 +33,12 @@ bitmovin_api = BitmovinApi(api_key=API_KEY, tenant_org_id=ORG_ID)
 
 # Example H.265 encoding profiles, including different resolutions, bitrate, and profiles.
 video_encoding_profiles = [
-    dict(height=240, bitrate=240000, profile=ProfileH265.MAIN, level=None, mode=StreamMode.STANDARD),
-    dict(height=360, bitrate=640000, profile=ProfileH265.MAIN, level=None, mode=StreamMode.STANDARD),
-    dict(height=480, bitrate=960000, profile=ProfileH265.MAIN, level=None, mode=StreamMode.STANDARD),
-    dict(height=540, bitrate=1600000, profile=ProfileH265.MAIN, level=None, mode=StreamMode.STANDARD),
-    dict(height=720, bitrate=3200000, profile=ProfileH265.MAIN, level=None, mode=StreamMode.STANDARD),
-    dict(height=1080, bitrate=4800000, profile=ProfileH265.MAIN, level=None, mode=StreamMode.STANDARD)
+    dict(height=240, crf=21, bitrate=240000, profile=ProfileH265.MAIN, level=None, mode=StreamMode.STANDARD),
+    dict(height=360, crf=21, bitrate=640000, profile=ProfileH265.MAIN, level=None, mode=StreamMode.STANDARD),
+    dict(height=480, crf=21, bitrate=960000, profile=ProfileH265.MAIN, level=None, mode=StreamMode.STANDARD),
+    dict(height=540, crf=21, bitrate=1600000, profile=ProfileH265.MAIN, level=None, mode=StreamMode.STANDARD),
+    dict(height=720, crf=21, bitrate=3200000, profile=ProfileH265.MAIN, level=None, mode=StreamMode.STANDARD),
+    dict(height=1080, crf=21, bitrate=4800000, profile=ProfileH265.MAIN, level=None, mode=StreamMode.STANDARD)
 ]
 
 # Example AAC audio encoding profiles, each with a specified bitrate and sample rate.
@@ -57,7 +57,7 @@ def main():
             port=2088
         )
     )
-    output = bitmovin_api.encoding.outputs.generic_s3.create(
+    soutput = bitmovin_api.encoding.outputs.generic_s3.create(
         generic_s3_output=GenericS3Output(
             access_key=LINODE_OBJECT_STORAGE_OUTPUT_ACCESS_KEY,
             secret_key=LINODE_OBJECT_STORAGE_OUTPUT_SECRET_KEY,
@@ -67,7 +67,7 @@ def main():
             ssl=True,
             port=443,
             signature_version=S3SignatureVersion.V4,
-            name='Test Linote Object Storage Output'))
+            name='Test Linode Object Storage Output'))
 
     # === Encoding instance definition ===
     encoding = bitmovin_api.encoding.encodings.create(
@@ -96,8 +96,8 @@ def main():
             h265_video_configuration=H265VideoConfiguration(
                 name='Sample H.265 Video Configuration',
                 height=video_profile.get("height"),
-                bitrate=video_profile.get("bitrate"),
-                max_bitrate=int(video_profile.get("bitrate") * 1.2),
+                crf=video_profile.get("crf"),
+                max_bitrate=video_profile.get("bitrate"),
                 bufsize=int(video_profile.get("bitrate") * 1.5),
                 profile=video_profile.get("profile"),
                 level=video_profile.get("level"),
@@ -106,7 +106,8 @@ def main():
                 min_keyframe_interval=2,
                 max_keyframe_interval=2,
                 color_config=color_config,
-                preset_configuration=PresetConfiguration.LIVE_HIGH_QUALITY
+                preset_configuration=PresetConfiguration.LIVE_HIGH_QUALITY,
+                encoding_mode=EncodingMode.SINGLE_PASS
             )
         )
 
@@ -126,7 +127,7 @@ def main():
 
         # Define the S3 output path for the final video segments
         video_muxing_output = EncodingOutput(
-            output_id=output.id,
+            output_id=soutput.id,
             output_path=f"{OUTPUT_BASE_PATH}video/{video_profile.get('height')}p",
             acl=[AclEntry(permission=AclPermission.PUBLIC_READ)]
         )
@@ -177,7 +178,7 @@ def main():
 
         # Define the GCS output path for audio segments
         audio_muxing_output = EncodingOutput(
-            output_id=output.id,
+            output_id=soutput.id,
             output_path=f"{OUTPUT_BASE_PATH}audio/{audio_profile.get('bitrate')}",
             acl=[AclEntry(permission=AclPermission.PUBLIC_READ)]
         )
@@ -196,8 +197,8 @@ def main():
         )
 
     # Define HLS and DASH manifests
-    hls_manifest = _create_hls_manifest(encoding_id=encoding.id, output=output, output_path=OUTPUT_BASE_PATH)
-    dash_manifest = _create_dash_manifest(encoding_id=encoding.id, output=output, output_path=OUTPUT_BASE_PATH)
+    hls_manifest = _create_hls_manifest(encoding_id=encoding.id, output=soutput, output_path=OUTPUT_BASE_PATH)
+    dash_manifest = _create_dash_manifest(encoding_id=encoding.id, output=soutput, output_path=OUTPUT_BASE_PATH)
 
     live_hls_manifest = LiveHlsManifest(
         manifest_id=hls_manifest.id,

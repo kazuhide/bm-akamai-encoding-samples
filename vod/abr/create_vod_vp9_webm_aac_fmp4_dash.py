@@ -78,7 +78,7 @@ def main():
             ssl=True,
             port=443,
             signature_version=S3SignatureVersion.V4,
-            name='Test Linote Object Storage Input'))
+            name='Test Linode Object Storage Input'))
     output = bitmovin_api.encoding.outputs.generic_s3.create(
         generic_s3_output=GenericS3Output(
             access_key=LINODE_OBJECT_STORAGE_OUTPUT_ACCESS_KEY,
@@ -89,7 +89,7 @@ def main():
             ssl=True,
             port=443,
             signature_version=S3SignatureVersion.V4,
-            name='Test Linote Object Storage Output'))
+            name='Test Linode Object Storage Output'))
 
     # 2) Create the Encoding instance specifying cloud region and encoder version.
     encoding = bitmovin_api.encoding.encodings.create(

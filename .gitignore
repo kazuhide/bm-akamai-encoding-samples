@@ -6,3 +6,9 @@
 
 # Test scripts
 **/test_*
+
+# Python / uv / ruff
+.venv/
+__pycache__/
+*.py[cod]
+.ruff_cache/

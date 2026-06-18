@@ -3,12 +3,12 @@ from time import sleep
 
 from bitmovin_api_sdk import BitmovinApi, BitmovinError
 from bitmovin_api_sdk import S3AccessStyle, S3SignatureVersion, GenericS3Output, SrtInput, SrtMode
-from bitmovin_api_sdk import Encoding, CloudRegion, EncodingMode
+from bitmovin_api_sdk import Encoding, CloudRegion
 from bitmovin_api_sdk import EncodingOutput, AclEntry, AclPermission
-from bitmovin_api_sdk import PresetConfiguration
+from bitmovin_api_sdk import Av1PresetConfiguration, EncodingMode
 from bitmovin_api_sdk import Stream, StreamInput, MuxingStream, StreamMode, ColorConfig
 from bitmovin_api_sdk import AacAudioConfiguration, AacChannelLayout
-from bitmovin_api_sdk import H264VideoConfiguration, CodecConfigType, ProfileH264, LevelH264, WeightedPredictionPFrames
+from bitmovin_api_sdk import Av1VideoConfiguration, CodecConfigType, AutoLevelSetup
 from bitmovin_api_sdk import Fmp4Muxing
 from bitmovin_api_sdk import HlsManifest, HlsVersion, AudioMediaInfo, StreamInfo
 from bitmovin_api_sdk import DashManifest, Period, VideoAdaptationSet, AudioAdaptationSet
@@ -17,7 +17,7 @@ from bitmovin_api_sdk import MessageType, StartLiveEncodingRequest, ManifestGene
 from bitmovin_api_sdk import LiveHlsManifest, LiveDashManifest, AvailabilityStartTimeMode
 from bitmovin_api_sdk import Status
 
-TEST_ITEM = "live-srt-ingest-h264-crf-aac-fmp4-hls-dash"
+TEST_ITEM = "live-srt-ingest-av1-vbr-aac-fmp4-hls-dash"
 
 API_KEY = '<INSERT YOUR API KEY>'
 ORG_ID = '<INSERT YOUR ORG ID>'
@@ -31,14 +31,13 @@ OUTPUT_BASE_PATH = f'output/{TEST_ITEM}/'
 
 bitmovin_api = BitmovinApi(api_key=API_KEY, tenant_org_id=ORG_ID)
 
-# Example H.264 encoding profiles, including different resolutions, bitrates, and profiles.
 video_encoding_profiles = [
-    dict(height=240, crf=22, bitrate=300000, profile=ProfileH264.HIGH, level=None, mode=StreamMode.STANDARD),
-    dict(height=360, crf=22, bitrate=800000, profile=ProfileH264.HIGH, level=None, mode=StreamMode.STANDARD),
-    dict(height=480, crf=22, bitrate=1200000, profile=ProfileH264.HIGH, level=None, mode=StreamMode.STANDARD),
-    dict(height=540, crf=22, bitrate=2000000, profile=ProfileH264.HIGH, level=None, mode=StreamMode.STANDARD),
-    dict(height=720, crf=22, bitrate=4000000, profile=ProfileH264.HIGH, level=None, mode=StreamMode.STANDARD),
-    dict(height=1080, crf=22, bitrate=6000000, profile=ProfileH264.HIGH, level=LevelH264.L4, mode=StreamMode.STANDARD)
+    dict(height=240,  bitrate=195000,  mode=StreamMode.STANDARD),
+    dict(height=360,  bitrate=385000,  mode=StreamMode.STANDARD),
+    dict(height=480,  bitrate=578000,  mode=StreamMode.STANDARD),
+    dict(height=540,  bitrate=920000,  mode=StreamMode.STANDARD),
+    dict(height=720,  bitrate=1378000, mode=StreamMode.STANDARD),
+    dict(height=1080, bitrate=2728000, mode=StreamMode.STANDARD),
 ]
 
 # Example AAC audio encoding profiles, each with a specified bitrate and sample rate.
@@ -67,7 +66,7 @@ def main():
             ssl=True,
             port=443,
             signature_version=S3SignatureVersion.V4,
-            name='Test Linote Object Storage Output'))
+            name='Test Linode Object Storage Output'))
 
     # === Encoding instance definition ===
     encoding = bitmovin_api.encoding.encodings.create(
@@ -81,7 +80,7 @@ def main():
     # === Video Profile definition ===
     for video_profile in video_encoding_profiles:
         """
-        Loop through each defined H.264 profile.
+        Loop through each defined H.265 profile.
         Create a color configuration that automatically copies color flags from the source.
         If the profile is HIGH, we enable certain advanced features like CABAC.
         If MAIN or BASELINE were used, you could set different values here.
@@ -91,61 +90,27 @@ def main():
             copy_color_transfer_flag=True,
             copy_color_space_flag=True
         )
-
-        if video_profile.get("profile") == ProfileH264.HIGH:
-            adaptive_spatial_transform = True
-            use_cabac = True
-            num_refframe = 4
-            num_bframe = 3
-            weighted_prediction_p_frames = WeightedPredictionPFrames.SMART
-        elif video_profile.get("profile") == ProfileH264.MAIN:
-            adaptive_spatial_transform = False
-            use_cabac = True
-            num_refframe = 4
-            num_bframe = 3
-            weighted_prediction_p_frames = WeightedPredictionPFrames.SMART
-        elif video_profile.get("profile") == ProfileH264.BASELINE:
-            adaptive_spatial_transform = False
-            use_cabac = False
-            num_refframe = 4
-            num_bframe = 0
-            weighted_prediction_p_frames = WeightedPredictionPFrames.DISABLED
-        else:
-            raise Exception("Unknown profile. Please specify a valid H.264 profile (HIGH, MAIN, or BASELINE).")
-
-        # Create Video Codec Configuration with advanced H.264 parameters
-        h264_codec = bitmovin_api.encoding.configurations.video.h264.create(
-            h264_video_configuration=H264VideoConfiguration(
-                name='Sample video codec configuration',
+        av1_config = bitmovin_api.encoding.configurations.video.av1.create(
+            av1_video_configuration=Av1VideoConfiguration(
+                name='AV1 Video Configuration',
                 height=video_profile.get("height"),
-                crf=video_profile.get("crf"),
-                max_bitrate=video_profile.get("bitrate"),
-                bufsize=int(video_profile.get("bitrate") * 1.5),
-                profile=video_profile.get("profile"),
-                level=video_profile.get("level"),
-                min_keyframe_interval=2,
-                max_keyframe_interval=2,
-                color_config=color_config,
-                ref_frames=num_refframe,
-                bframes=num_bframe,
-                cabac=use_cabac,
-                adaptive_spatial_transform=adaptive_spatial_transform,
-                weighted_prediction_p_frames=weighted_prediction_p_frames,
-                preset_configuration=PresetConfiguration.LIVE_ULTRAHIGH_QUALITY,
-                encoding_mode=EncodingMode.SINGLE_PASS
+                bitrate=video_profile.get("bitrate"),
+                auto_level_setup=AutoLevelSetup.ENABLED,
+                preset_configuration=Av1PresetConfiguration.VOD_SPEED,
+                encoding_mode=EncodingMode.TWO_PASS,
+                color_config=color_config
             )
         )
-
-        # Create a Stream that uses the above H.264 codec configuration
-        h264_stream = bitmovin_api.encoding.encodings.streams.create(
+        # Create a Stream that uses the above AV1 codec configuration
+        av1_stream = bitmovin_api.encoding.encodings.streams.create(
             encoding_id=encoding.id,
             stream=Stream(
-                codec_config_id=h264_codec.id,
+                codec_config_id=av1_config.id,
                 input_streams=[StreamInput(
                     input_id=srt_input.id,
                     input_path="live",
                     position=0)],
-                name=f"Stream H264 {video_profile.get('height')}p",
+                name=f"Stream AV1 {video_profile.get('height')}p",
                 mode=video_profile.get('mode')
             )
         )
@@ -164,7 +129,7 @@ def main():
                 segment_length=6,
                 segment_naming='segment_%number%.m4s',
                 init_segment_name='init.mp4',
-                streams=[MuxingStream(stream_id=h264_stream.id)],
+                streams=[MuxingStream(stream_id=av1_stream.id)],
                 outputs=[video_muxing_output],
                 name=f"Video FMP4 Muxing {video_profile.get('height')}p"
             )
@@ -346,7 +311,7 @@ def _create_hls_manifest(encoding_id, output, output_path):
         if 'PER_TITLE_TEMPLATE' in stream.mode.value:
             continue
 
-        # Identify if the muxing belongs to an AAC (audio) or H.264 (video) stream
+        # Identify if the muxing belongs to an AAC (audio) or AV1 (video) stream
         codec = bitmovin_api.encoding.configurations.type.get(configuration_id=stream.codec_config_id)
 
         # Build the relative segment path for the manifest
@@ -368,9 +333,9 @@ def _create_hls_manifest(encoding_id, output, output_path):
                     muxing_id=muxing.id,
                     uri=f'audio_{audio_codec.bitrate}.m3u8'))
 
-        elif codec.type == CodecConfigType.H264:
+        elif codec.type == CodecConfigType.AV1:
             # Build an HLS video stream
-            video_codec = bitmovin_api.encoding.configurations.video.h264.get(configuration_id=stream.codec_config_id)
+            video_codec = bitmovin_api.encoding.configurations.video.av1.get(configuration_id=stream.codec_config_id)
             bitmovin_api.encoding.manifests.hls.streams.create(
                 manifest_id=hls_manifest.id,
                 stream_info=StreamInfo(
@@ -433,7 +398,7 @@ def _create_dash_manifest(encoding_id, output, output_path):
         if 'PER_TITLE_TEMPLATE' in stream.mode.value:
             continue
 
-        # Identify if the muxing is for an AAC or H.264 stream
+        # Identify if the muxing is for an AAC or AV1 stream
         codec = bitmovin_api.encoding.configurations.type.get(configuration_id=stream.codec_config_id)
         segment_path = _remove_output_base_path(muxing.outputs[0].output_path)
 
@@ -446,11 +411,10 @@ def _create_dash_manifest(encoding_id, output, output_path):
                 dash_fmp4_representation=DashFmp4Representation(
                     encoding_id=encoding_id,
                     muxing_id=muxing.id,
-                    type_=DashRepresentationType.TEMPLATE,
-                    mode=DashRepresentationTypeMode.TEMPLATE_REPRESENTATION,
+                    type_=DashRepresentationType.TIMELINE,
                     segment_path=segment_path))
 
-        elif codec.type == CodecConfigType.H264:
+        elif codec.type == CodecConfigType.AV1:
             # Attach this muxing to the video adaptation set
             bitmovin_api.encoding.manifests.dash.periods.adaptationsets.representations.fmp4.create(
                 manifest_id=dash_manifest.id,
@@ -459,8 +423,7 @@ def _create_dash_manifest(encoding_id, output, output_path):
                 dash_fmp4_representation=DashFmp4Representation(
                     encoding_id=encoding_id,
                     muxing_id=muxing.id,
-                    type_=DashRepresentationType.TEMPLATE,
-                    mode=DashRepresentationTypeMode.TEMPLATE_REPRESENTATION,
+                    type_=DashRepresentationType.TIMELINE,
                     segment_path=segment_path))
 
     return dash_manifest
@@ -551,7 +514,7 @@ def _remove_output_base_path(text):
     Remove the OUTPUT_BASE_PATH prefix from the given path.
     Used for constructing relative segment paths for HLS/DASH manifests.
 
-    :param text: The full path (e.g., 'output/h264-aac-fmp4-hls-dash/video/720p')
+    :param text: The full path (e.g., 'output/av1-aac-fmp4-hls-dash/video/720p')
     :return: Relative path without the OUTPUT_BASE_PATH prefix
     """
     if text.startswith(OUTPUT_BASE_PATH):
