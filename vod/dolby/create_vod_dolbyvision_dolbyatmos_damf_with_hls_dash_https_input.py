@@ -33,17 +33,17 @@ LINODE_OBJECT_STORAGE_OUTPUT_SECRET_KEY = '<INSERT_YOUR_SECRET_KEY>'
 LINODE_OBJECT_STORAGE_OUTPUT_BUCKET_NAME = '<INSERT_YOUR_BUCKET_NAME>'
 LINODE_OBJECT_STORAGE_OUTPUT_HOST_NAME = '<INSERT_YOUR_OUTPUT_HOST_NAME>'
 
-OUTPUT_BASE_PATH = 'output/{}/'.format(TEST_ITEM)
+OUTPUT_BASE_PATH = f'output/{TEST_ITEM}/'
 
 bitmovin_api = BitmovinApi(api_key=API_KEY, tenant_org_id=ORG_ID)
 
 encoding_profiles_h265_dolbyvision = [
-    dict(height=1080, bitrate=2_000_000, level=None, aqs=0.5, mode=StreamMode.STANDARD, dynamic_range=H265DynamicRangeFormat.DOLBY_VISION),
-    dict(height=540, bitrate=1_000_000, level=None, aqs=1.2, mode=StreamMode.STANDARD, dynamic_range=H265DynamicRangeFormat.DOLBY_VISION)
+    {"height": 1080, "bitrate": 2_000_000, "level": None, "aqs": 0.5, "mode": StreamMode.STANDARD, "dynamic_range": H265DynamicRangeFormat.DOLBY_VISION},
+    {"height": 540, "bitrate": 1_000_000, "level": None, "aqs": 1.2, "mode": StreamMode.STANDARD, "dynamic_range": H265DynamicRangeFormat.DOLBY_VISION}
 ]
 
 encoding_profiles_atmos = [
-    dict(bitrate=448000, rate=48_000)
+    {"bitrate": 448000, "rate": 48_000}
 ]
 
 
@@ -93,7 +93,7 @@ def main():
     video_encoding_configs = []
     for idx, _ in enumerate(encoding_profiles_h265_dolbyvision):
         profile_h265 = encoding_profiles_h265_dolbyvision[idx]
-        encoding_config = dict(profile_h265=profile_h265)
+        encoding_config = {"profile_h265": profile_h265}
         encoding_config['h265_codec'] = bitmovin_api.encoding.configurations.video.h265.create(
             h265_video_configuration=H265VideoConfiguration(
                 name='Sample video codec configuration',
@@ -127,7 +127,7 @@ def main():
     audio_encoding_configs = []
     for idx, _ in enumerate(encoding_profiles_atmos):
         profile_atmos = encoding_profiles_atmos[idx]
-        encoding_config = dict(profile_atmos=profile_atmos)
+        encoding_config = {"profile_atmos": profile_atmos}
         encoding_config['atmos_codec'] = bitmovin_api.encoding.configurations.audio.dolby_atmos.create(
             dolby_atmos_audio_configuration=DolbyAtmosAudioConfiguration(
                 bitrate=profile_atmos.get("bitrate"),
@@ -318,7 +318,7 @@ def _create_hls_manifest(encoding_id, output, output_path):
                     encoding_id=encoding_id,
                     stream_id=stream.id,
                     muxing_id=muxing.id,
-                    uri='audio_{}.m3u8'.format(audio_codec.bitrate)))
+                    uri=f'audio_{audio_codec.bitrate}.m3u8'))
 
         elif codec.type == CodecConfigType.H265:
             video_codec = bitmovin_api.encoding.configurations.video.h265.get(configuration_id=stream.codec_config_id)
@@ -328,7 +328,7 @@ def _create_hls_manifest(encoding_id, output, output_path):
                     audio='audio',
                     closed_captions='NONE',
                     segment_path=segment_path,
-                    uri='video_{}.m3u8'.format(video_codec.bitrate),
+                    uri=f'video_{video_codec.bitrate}.m3u8',
                     encoding_id=encoding_id,
                     stream_id=stream.id,
                     muxing_id=muxing.id))
@@ -366,21 +366,21 @@ def _execute_hls_manifest_generation(hls_manifest):
 def _wait_for_enoding_to_finish(encoding_id):
     time.sleep(5)
     task = bitmovin_api.encoding.encodings.status(encoding_id=encoding_id)
-    print("Encoding status is {} (progress: {} %)".format(task.status, task.progress))
+    print(f"Encoding status is {task.status} (progress: {task.progress} %)")
     return task
 
 
 def _wait_for_dash_manifest_to_finish(manifest_id):
     time.sleep(5)
     task = bitmovin_api.encoding.manifests.dash.status(manifest_id=manifest_id)
-    print("DASH manifest status is {} (progress: {} %)".format(task.status, task.progress))
+    print(f"DASH manifest status is {task.status} (progress: {task.progress} %)")
     return task
 
 
 def _wait_for_hls_manifest_to_finish(manifest_id):
     time.sleep(5)
     task = bitmovin_api.encoding.manifests.hls.status(manifest_id=manifest_id)
-    print("HLS manifest status is {} (progress: {} %)".format(task.status, task.progress))
+    print(f"HLS manifest status is {task.status} (progress: {task.progress} %)")
     return task
 
 

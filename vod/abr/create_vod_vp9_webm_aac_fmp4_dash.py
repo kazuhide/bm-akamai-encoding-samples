@@ -38,18 +38,18 @@ bitmovin_api = BitmovinApi(api_key=API_KEY, tenant_org_id=ORG_ID)
 
 # Example VP9 encoding profiles for video, defining different resolutions, bitrates, and encoding modes.
 video_encoding_profiles = [
-    dict(height=240,  bitrate=300000,  mode=StreamMode.STANDARD),
-    dict(height=360,  bitrate=800000,  mode=StreamMode.STANDARD),
-    dict(height=480,  bitrate=1200000, mode=StreamMode.STANDARD),
-    dict(height=540,  bitrate=2000000, mode=StreamMode.STANDARD),
-    dict(height=720,  bitrate=4000000, mode=StreamMode.STANDARD),
-    dict(height=1080, bitrate=6000000, mode=StreamMode.STANDARD)
+    {"height": 240, "bitrate": 300000, "mode": StreamMode.STANDARD},
+    {"height": 360, "bitrate": 800000, "mode": StreamMode.STANDARD},
+    {"height": 480, "bitrate": 1200000, "mode": StreamMode.STANDARD},
+    {"height": 540, "bitrate": 2000000, "mode": StreamMode.STANDARD},
+    {"height": 720, "bitrate": 4000000, "mode": StreamMode.STANDARD},
+    {"height": 1080, "bitrate": 6000000, "mode": StreamMode.STANDARD}
 ]
 
 # Example AAC audio encoding profiles, each with a specified bitrate and sample rate.
 audio_encoding_profiles = [
-    dict(bitrate=128000, rate=48000),
-    dict(bitrate=64000,  rate=44100)
+    {"bitrate": 128000, "rate": 48000},
+    {"bitrate": 64000, "rate": 44100}
 ]
 
 
@@ -204,7 +204,7 @@ def main():
             stream=Stream(
                 codec_config_id=aac_codec.id,
                 input_streams=[audio_input_stream],
-                name=f"Stream AAC {audio_profile.get('bitrate')/1000:.0f}kbps",
+                name=f"Stream AAC {audio_profile.get('bitrate') / 1000:.0f}kbps",
                 mode=StreamMode.STANDARD
             )
         )

@@ -1,4 +1,3 @@
-import time
 from time import sleep
 
 from bitmovin_api_sdk import BitmovinApi, BitmovinError
@@ -33,18 +32,18 @@ bitmovin_api = BitmovinApi(api_key=API_KEY, tenant_org_id=ORG_ID)
 
 # Example H.265 encoding profiles, including different resolutions, bitrate, and profiles.
 video_encoding_profiles = [
-    dict(height=240, bitrate=240000, profile=ProfileH265.MAIN, level=None, mode=StreamMode.STANDARD),
-    dict(height=360, bitrate=640000, profile=ProfileH265.MAIN, level=None, mode=StreamMode.STANDARD),
-    dict(height=480, bitrate=960000, profile=ProfileH265.MAIN, level=None, mode=StreamMode.STANDARD),
-    dict(height=540, bitrate=1600000, profile=ProfileH265.MAIN, level=None, mode=StreamMode.STANDARD),
-    dict(height=720, bitrate=3200000, profile=ProfileH265.MAIN, level=None, mode=StreamMode.STANDARD),
-    dict(height=1080, bitrate=4800000, profile=ProfileH265.MAIN, level=None, mode=StreamMode.STANDARD)
+    {"height": 240, "bitrate": 240000, "profile": ProfileH265.MAIN, "level": None, "mode": StreamMode.STANDARD},
+    {"height": 360, "bitrate": 640000, "profile": ProfileH265.MAIN, "level": None, "mode": StreamMode.STANDARD},
+    {"height": 480, "bitrate": 960000, "profile": ProfileH265.MAIN, "level": None, "mode": StreamMode.STANDARD},
+    {"height": 540, "bitrate": 1600000, "profile": ProfileH265.MAIN, "level": None, "mode": StreamMode.STANDARD},
+    {"height": 720, "bitrate": 3200000, "profile": ProfileH265.MAIN, "level": None, "mode": StreamMode.STANDARD},
+    {"height": 1080, "bitrate": 4800000, "profile": ProfileH265.MAIN, "level": None, "mode": StreamMode.STANDARD}
 ]
 
 # Example AAC audio encoding profiles, each with a specified bitrate and sample rate.
 audio_encoding_profiles = [
-    dict(bitrate=128000, rate=48_000),
-    dict(bitrate=64000, rate=44_100)
+    {"bitrate": 128000, "rate": 48_000},
+    {"bitrate": 64000, "rate": 44_100}
 ]
 
 
@@ -170,7 +169,7 @@ def main():
                     input_id=srt_input.id,
                     input_path="live",
                     position=1)],
-                name=f"Stream AAC {audio_profile.get('bitrate')/1000:.0f}kbps",
+                name=f"Stream AAC {audio_profile.get('bitrate') / 1000:.0f}kbps",
                 mode=StreamMode.STANDARD
             )
         )
@@ -224,8 +223,8 @@ def main():
     _execute_live_encoding(encoding=encoding, start_live_encoding_request=start_live_encoding_request)
     live_encoding = _wait_for_live_encoding_details(encoding=encoding)
 
-    print("Live encoding is up and ready for ingest. SRT URL: SRT://{0}/(port) StreamKey: {1}"
-          .format(live_encoding.encoder_ip, live_encoding.stream_key))
+    print(f"Live encoding is up and ready for ingest. SRT URL: SRT://{live_encoding.encoder_ip}/(port) StreamKey: {live_encoding.stream_key}"
+          )
 
     input("Press Enter to shutdown the live encoding...")
 
@@ -255,15 +254,15 @@ def _wait_until_encoding_is_in_state(encoding, expected_status):
             _log_task_errors(task=task)
             raise Exception("Encoding failed")
 
-        print("Encoding status is {0}. Waiting for status {1} ({2} / {3})"
-              .format(task.status, expected_status, attempt, max_attempts))
+        print(f"Encoding status is {task.status}. Waiting for status {expected_status} ({attempt} / {max_attempts})"
+              )
 
         sleep(check_interval_in_seconds)
 
         attempt += 1
 
-    raise Exception("Encoding did not switch to state {0} within {1} minutes. Aborting."
-                    .format(expected_status, 5))
+    raise Exception(f"Encoding did not switch to state {expected_status} within {5} minutes. Aborting."
+                    )
 
 
 def _wait_for_live_encoding_details(encoding):
@@ -274,13 +273,13 @@ def _wait_for_live_encoding_details(encoding):
         try:
             return bitmovin_api.encoding.encodings.live.get(encoding_id=encoding.id)
         except BitmovinError:
-            print("Failed to fetch live encoding details. Retrying... {0} / {1}"
-                  .format(retries, max_retries))
+            print(f"Failed to fetch live encoding details. Retrying... {retries} / {max_retries}"
+                  )
             retries += 1
             sleep(timeout_interval_seconds)
 
-    raise Exception("Live encoding details could not be fetched after {0} minutes"
-                    .format(5))
+    raise Exception(f"Live encoding details could not be fetched after {5} minutes"
+                    )
 
 
 def _create_hls_manifest(encoding_id, output, output_path):
