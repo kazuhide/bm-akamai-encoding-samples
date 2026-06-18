@@ -25,7 +25,7 @@ ORG_ID = '<INSERT YOUR ORG ID>'
 LINODE_OBJECT_STORAGE_OUTPUT_ACCESS_KEY = '<INSERT_YOUR_ACCESS_KEY>'
 LINODE_OBJECT_STORAGE_OUTPUT_SECRET_KEY = '<INSERT_YOUR_SECRET_KEY>'
 LINODE_OBJECT_STORAGE_OUTPUT_BUCKET_NAME = '<INSERT_YOUR_BUCKET_NAME>'
-LINODE_OBJECT_STORAGE_OUTPUT_HOST_NAME = '<INSERT_YOUR_INPUT_HOST_NAME>'
+LINODE_OBJECT_STORAGE_OUTPUT_HOST_NAME = '<INSERT_YOUR_OUTPUT_HOST_NAME>'
 
 OUTPUT_BASE_PATH = f'output/{TEST_ITEM}/'
 
@@ -201,7 +201,7 @@ def main():
             )
         )
 
-        # Define the GCS output path for audio segments
+        # Define the output path for audio segments
         audio_muxing_output = EncodingOutput(
             output_id=output.id,
             output_path=f"{OUTPUT_BASE_PATH}audio/{audio_profile.get('bitrate')}",
@@ -315,7 +315,7 @@ def _create_hls_manifest(encoding_id, output, output_path):
     Loop through all FMP4 muxings and add audio or video entries to the HLS manifest.
 
     :param encoding_id: The ID of the encoding whose muxings are being processed.
-    :param output: A GcsOutput (or other Output) object to specify the target output location.
+    :param output: An Output object that specifies the target output location.
     :param output_path: Base output path in the bucket for the manifest and segments.
     :return: HlsManifest object that was created.
     """
@@ -391,7 +391,7 @@ def _create_dash_manifest(encoding_id, output, output_path):
     and appending FMP4 representations for each muxing/stream combination.
 
     :param encoding_id: The ID of the encoding to associate with this manifest.
-    :param output: A GcsOutput (or other Output) for the manifest's final location.
+    :param output: An Output object for the manifest's final location.
     :param output_path: Base output path in the bucket where the manifest files will be written.
     :return: DashManifest object that was created.
     """
@@ -464,86 +464,6 @@ def _create_dash_manifest(encoding_id, output, output_path):
                     segment_path=segment_path))
 
     return dash_manifest
-
-
-def _execute_hls_manifest_generation(hls_manifest):
-    """
-    Starts the HLS manifest generation job and polls for completion.
-
-    :param hls_manifest: The HlsManifest object that needs to be generated.
-    """
-    bitmovin_api.encoding.manifests.hls.start(manifest_id=hls_manifest.id)
-
-    task = _wait_for_hls_manifest_to_finish(manifest_id=hls_manifest.id)
-
-    while task.status is not Status.FINISHED and task.status is not Status.ERROR:
-        task = _wait_for_hls_manifest_to_finish(manifest_id=hls_manifest.id)
-    if task.status is Status.ERROR:
-        _log_task_errors(task=task)
-        raise Exception("HLS Manifest Creation failed")
-
-    print("HLS Manifest Creation finished successfully")
-
-
-def _execute_dash_manifest_generation(dash_manifest):
-    """
-    Starts the DASH manifest generation job and polls for completion.
-
-    :param dash_manifest: The DashManifest object that needs to be generated.
-    """
-    bitmovin_api.encoding.manifests.dash.start(manifest_id=dash_manifest.id)
-
-    task = _wait_for_dash_manifest_to_finish(manifest_id=dash_manifest.id)
-
-    while task.status is not Status.FINISHED and task.status is not Status.ERROR:
-        task = _wait_for_dash_manifest_to_finish(manifest_id=dash_manifest.id)
-    if task.status is Status.ERROR:
-        _log_task_errors(task=task)
-        raise Exception("DASH Manifest Creation failed")
-
-    print("DASH Manifest Creation finished successfully")
-
-
-def _wait_for_encoding_to_finish(encoding_id):
-    """
-    Poll the encoding status every 5 seconds until
-    it either finishes or encounters an error.
-
-    :param encoding_id: The ID of the encoding to poll.
-    :return: The final task status of the encoding.
-    """
-    time.sleep(5)
-    task = bitmovin_api.encoding.encodings.status(encoding_id=encoding_id)
-    print(f"Encoding status is {task.status} (progress: {task.progress} %)")
-    return task
-
-
-def _wait_for_hls_manifest_to_finish(manifest_id):
-    """
-    Poll the HLS manifest creation status every 5 seconds
-    until it either finishes or encounters an error.
-
-    :param manifest_id: The ID of the HLS manifest to poll.
-    :return: The final task status of the HLS manifest creation process.
-    """
-    time.sleep(5)
-    task = bitmovin_api.encoding.manifests.hls.status(manifest_id=manifest_id)
-    print(f"HLS manifest status is {task.status} (progress: {task.progress} %)")
-    return task
-
-
-def _wait_for_dash_manifest_to_finish(manifest_id):
-    """
-    Poll the DASH manifest creation status every 5 seconds
-    until it either finishes or encounters an error.
-
-    :param manifest_id: The ID of the DASH manifest to poll.
-    :return: The final task status of the DASH manifest creation process.
-    """
-    time.sleep(5)
-    task = bitmovin_api.encoding.manifests.dash.status(manifest_id=manifest_id)
-    print("DASH manifest status is {} (progress: {} %)".format(task.status, task.progress))
-    return task
 
 
 def _remove_output_base_path(text):

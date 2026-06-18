@@ -294,7 +294,7 @@ def main():
     hls_manifest = _create_hls_manifest(encoding_id=encoding.id, output=output, output_path=OUTPUT_BASE_PATH)
     dash_manifest = _create_dash_manifest(encoding_id=encoding.id, output=output, output_path=OUTPUT_BASE_PATH)
 
-    # 7) Create HLS and DASH Manifests
+    # 8) Generate HLS and DASH Manifests
     _execute_hls_manifest_generation(hls_manifest=hls_manifest)
     _execute_dash_manifest_generation(dash_manifest=dash_manifest)
 
