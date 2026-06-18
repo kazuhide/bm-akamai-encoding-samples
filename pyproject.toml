@@ -1,0 +1,40 @@
+[project]
+name = "bm-akamai-encoding-samples"
+version = "0.1.0"
+description = "Bitmovin Encoder Python samples for Akamai Connected Cloud (VOD / Live)"
+requires-python = ">=3.13,<3.14"
+dependencies = [
+    "bitmovin-api-sdk>=1.265.0",
+]
+
+[tool.uv]
+python-preference = "only-system"
+python-downloads = "manual"
+
+[dependency-groups]
+dev = [
+    "ruff>=0.15.12",
+]
+
+[tool.ruff]
+target-version = "py313"
+line-length = 250
+
+[tool.ruff.lint]
+preview = true
+select = [
+  "E",    # pycodestyle errors
+  "W",    # pycodestyle warnings
+  "F",    # pyflakes
+  "B",    # flake8-bugbear
+  "UP",   # pyupgrade
+  "SIM",  # flake8-simplify
+  "C4",   # flake8-comprehensions
+  "PIE",  # flake8-pie
+  "RET",  # flake8-return
+  "RUF",  # Ruff-specific
+]
+
+[tool.ruff.format]
+quote-style = "preserve"
+indent-style = "space"
