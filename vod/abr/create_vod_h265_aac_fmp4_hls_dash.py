@@ -31,7 +31,7 @@ INPUT_PATH = '/path/to/your/input/file.mp4'
 LINODE_OBJECT_STORAGE_OUTPUT_ACCESS_KEY = '<INSERT_YOUR_ACCESS_KEY>'
 LINODE_OBJECT_STORAGE_OUTPUT_SECRET_KEY = '<INSERT_YOUR_SECRET_KEY>'
 LINODE_OBJECT_STORAGE_OUTPUT_BUCKET_NAME = '<INSERT_YOUR_BUCKET_NAME>'
-LINODE_OBJECT_STORAGE_OUTPUT_HOST_NAME = '<INSERT_YOUR_INPUT_HOST_NAME>'
+LINODE_OBJECT_STORAGE_OUTPUT_HOST_NAME = '<INSERT_YOUR_OUTPUT_HOST_NAME>'
 
 OUTPUT_BASE_PATH = f'output/{TEST_ITEM}/'
 
@@ -39,18 +39,18 @@ bitmovin_api = BitmovinApi(api_key=API_KEY, tenant_org_id=ORG_ID)
 
 # Example H.265 (HEVC) encoding profiles with different resolutions and bitrates.
 video_encoding_profiles = [
-    dict(height=240,  bitrate=300000,  profile=ProfileH265.MAIN, level=None, mode=StreamMode.STANDARD),
-    dict(height=360,  bitrate=800000,  profile=ProfileH265.MAIN, level=None, mode=StreamMode.STANDARD),
-    dict(height=480,  bitrate=1200000, profile=ProfileH265.MAIN, level=None, mode=StreamMode.STANDARD),
-    dict(height=540,  bitrate=2000000, profile=ProfileH265.MAIN, level=None, mode=StreamMode.STANDARD),
-    dict(height=720,  bitrate=4000000, profile=ProfileH265.MAIN, level=None, mode=StreamMode.STANDARD),
-    dict(height=1080, bitrate=6000000, profile=ProfileH265.MAIN, level=None, mode=StreamMode.STANDARD),
+    {"height": 240, "bitrate": 300000, "profile": ProfileH265.MAIN, "level": None, "mode": StreamMode.STANDARD},
+    {"height": 360, "bitrate": 800000, "profile": ProfileH265.MAIN, "level": None, "mode": StreamMode.STANDARD},
+    {"height": 480, "bitrate": 1200000, "profile": ProfileH265.MAIN, "level": None, "mode": StreamMode.STANDARD},
+    {"height": 540, "bitrate": 2000000, "profile": ProfileH265.MAIN, "level": None, "mode": StreamMode.STANDARD},
+    {"height": 720, "bitrate": 4000000, "profile": ProfileH265.MAIN, "level": None, "mode": StreamMode.STANDARD},
+    {"height": 1080, "bitrate": 6000000, "profile": ProfileH265.MAIN, "level": None, "mode": StreamMode.STANDARD},
 ]
 
 # Example AAC audio encoding profiles
 audio_encoding_profiles = [
-    dict(bitrate=128000, rate=48000),
-    dict(bitrate=64000,  rate=44100)
+    {"bitrate": 128000, "rate": 48000},
+    {"bitrate": 64000, "rate": 44100}
 ]
 
 
@@ -192,7 +192,7 @@ def main():
             stream=Stream(
                 codec_config_id=aac_codec.id,
                 input_streams=[audio_input_stream],
-                name=f"Stream AAC {audio_profile.get('bitrate')/1000:.0f}kbps",
+                name=f"Stream AAC {audio_profile.get('bitrate') / 1000:.0f}kbps",
                 mode=StreamMode.STANDARD
             )
         )

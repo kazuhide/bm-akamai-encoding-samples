@@ -1,4 +1,3 @@
-import time
 from time import sleep
 
 from bitmovin_api_sdk import BitmovinApi, BitmovinError
@@ -25,7 +24,7 @@ ORG_ID = '<INSERT YOUR ORG ID>'
 LINODE_OBJECT_STORAGE_OUTPUT_ACCESS_KEY = '<INSERT_YOUR_ACCESS_KEY>'
 LINODE_OBJECT_STORAGE_OUTPUT_SECRET_KEY = '<INSERT_YOUR_SECRET_KEY>'
 LINODE_OBJECT_STORAGE_OUTPUT_BUCKET_NAME = '<INSERT_YOUR_BUCKET_NAME>'
-LINODE_OBJECT_STORAGE_OUTPUT_HOST_NAME = '<INSERT_YOUR_INPUT_HOST_NAME>'
+LINODE_OBJECT_STORAGE_OUTPUT_HOST_NAME = '<INSERT_YOUR_OUTPUT_HOST_NAME>'
 
 OUTPUT_BASE_PATH = f'output/{TEST_ITEM}/'
 
@@ -33,18 +32,18 @@ bitmovin_api = BitmovinApi(api_key=API_KEY, tenant_org_id=ORG_ID)
 
 # Example H.264 encoding profiles, including different resolutions, bitrates, and profiles.
 video_encoding_profiles = [
-    dict(height=240, crf=22, bitrate=300000, profile=ProfileH264.HIGH, level=None, mode=StreamMode.STANDARD),
-    dict(height=360, crf=22, bitrate=800000, profile=ProfileH264.HIGH, level=None, mode=StreamMode.STANDARD),
-    dict(height=480, crf=22, bitrate=1200000, profile=ProfileH264.HIGH, level=None, mode=StreamMode.STANDARD),
-    dict(height=540, crf=22, bitrate=2000000, profile=ProfileH264.HIGH, level=None, mode=StreamMode.STANDARD),
-    dict(height=720, crf=22, bitrate=4000000, profile=ProfileH264.HIGH, level=None, mode=StreamMode.STANDARD),
-    dict(height=1080, crf=22, bitrate=6000000, profile=ProfileH264.HIGH, level=LevelH264.L4, mode=StreamMode.STANDARD)
+    {"height": 240, "crf": 22, "bitrate": 300000, "profile": ProfileH264.HIGH, "level": None, "mode": StreamMode.STANDARD},
+    {"height": 360, "crf": 22, "bitrate": 800000, "profile": ProfileH264.HIGH, "level": None, "mode": StreamMode.STANDARD},
+    {"height": 480, "crf": 22, "bitrate": 1200000, "profile": ProfileH264.HIGH, "level": None, "mode": StreamMode.STANDARD},
+    {"height": 540, "crf": 22, "bitrate": 2000000, "profile": ProfileH264.HIGH, "level": None, "mode": StreamMode.STANDARD},
+    {"height": 720, "crf": 22, "bitrate": 4000000, "profile": ProfileH264.HIGH, "level": None, "mode": StreamMode.STANDARD},
+    {"height": 1080, "crf": 22, "bitrate": 6000000, "profile": ProfileH264.HIGH, "level": LevelH264.L4, "mode": StreamMode.STANDARD}
 ]
 
 # Example AAC audio encoding profiles, each with a specified bitrate and sample rate.
 audio_encoding_profiles = [
-    dict(bitrate=128000, rate=48_000),
-    dict(bitrate=64000, rate=44_100)
+    {"bitrate": 128000, "rate": 48_000},
+    {"bitrate": 64000, "rate": 44_100}
 ]
 
 
@@ -196,12 +195,12 @@ def main():
                     input_id=srt_input.id,
                     input_path="live",
                     position=1)],
-                name=f"Stream AAC {audio_profile.get('bitrate')/1000:.0f}kbps",
+                name=f"Stream AAC {audio_profile.get('bitrate') / 1000:.0f}kbps",
                 mode=StreamMode.STANDARD
             )
         )
 
-        # Define the GCS output path for audio segments
+        # Define the output path for audio segments
         audio_muxing_output = EncodingOutput(
             output_id=output.id,
             output_path=f"{OUTPUT_BASE_PATH}audio/{audio_profile.get('bitrate')}",
@@ -250,8 +249,8 @@ def main():
     _execute_live_encoding(encoding=encoding, start_live_encoding_request=start_live_encoding_request)
     live_encoding = _wait_for_live_encoding_details(encoding=encoding)
 
-    print("Live encoding is up and ready for ingest. SRT URL: SRT://{0}/(port) StreamKey: {1}"
-          .format(live_encoding.encoder_ip, live_encoding.stream_key))
+    print(f"Live encoding is up and ready for ingest. SRT URL: SRT://{live_encoding.encoder_ip}/(port) StreamKey: {live_encoding.stream_key}"
+          )
 
     input("Press Enter to shutdown the live encoding...")
 
@@ -281,15 +280,15 @@ def _wait_until_encoding_is_in_state(encoding, expected_status):
             _log_task_errors(task=task)
             raise Exception("Encoding failed")
 
-        print("Encoding status is {0}. Waiting for status {1} ({2} / {3})"
-              .format(task.status, expected_status, attempt, max_attempts))
+        print(f"Encoding status is {task.status}. Waiting for status {expected_status} ({attempt} / {max_attempts})"
+              )
 
         sleep(check_interval_in_seconds)
 
         attempt += 1
 
-    raise Exception("Encoding did not switch to state {0} within {1} minutes. Aborting."
-                    .format(expected_status, 5))
+    raise Exception(f"Encoding did not switch to state {expected_status} within {5} minutes. Aborting."
+                    )
 
 
 def _wait_for_live_encoding_details(encoding):
@@ -300,13 +299,13 @@ def _wait_for_live_encoding_details(encoding):
         try:
             return bitmovin_api.encoding.encodings.live.get(encoding_id=encoding.id)
         except BitmovinError:
-            print("Failed to fetch live encoding details. Retrying... {0} / {1}"
-                  .format(retries, max_retries))
+            print(f"Failed to fetch live encoding details. Retrying... {retries} / {max_retries}"
+                  )
             retries += 1
             sleep(timeout_interval_seconds)
 
-    raise Exception("Live encoding details could not be fetched after {0} minutes"
-                    .format(5))
+    raise Exception(f"Live encoding details could not be fetched after {5} minutes"
+                    )
 
 
 def _create_hls_manifest(encoding_id, output, output_path):
@@ -315,7 +314,7 @@ def _create_hls_manifest(encoding_id, output, output_path):
     Loop through all FMP4 muxings and add audio or video entries to the HLS manifest.
 
     :param encoding_id: The ID of the encoding whose muxings are being processed.
-    :param output: A GcsOutput (or other Output) object to specify the target output location.
+    :param output: An Output object that specifies the target output location.
     :param output_path: Base output path in the bucket for the manifest and segments.
     :return: HlsManifest object that was created.
     """
@@ -391,7 +390,7 @@ def _create_dash_manifest(encoding_id, output, output_path):
     and appending FMP4 representations for each muxing/stream combination.
 
     :param encoding_id: The ID of the encoding to associate with this manifest.
-    :param output: A GcsOutput (or other Output) for the manifest's final location.
+    :param output: An Output object for the manifest's final location.
     :param output_path: Base output path in the bucket where the manifest files will be written.
     :return: DashManifest object that was created.
     """
@@ -464,86 +463,6 @@ def _create_dash_manifest(encoding_id, output, output_path):
                     segment_path=segment_path))
 
     return dash_manifest
-
-
-def _execute_hls_manifest_generation(hls_manifest):
-    """
-    Starts the HLS manifest generation job and polls for completion.
-
-    :param hls_manifest: The HlsManifest object that needs to be generated.
-    """
-    bitmovin_api.encoding.manifests.hls.start(manifest_id=hls_manifest.id)
-
-    task = _wait_for_hls_manifest_to_finish(manifest_id=hls_manifest.id)
-
-    while task.status is not Status.FINISHED and task.status is not Status.ERROR:
-        task = _wait_for_hls_manifest_to_finish(manifest_id=hls_manifest.id)
-    if task.status is Status.ERROR:
-        _log_task_errors(task=task)
-        raise Exception("HLS Manifest Creation failed")
-
-    print("HLS Manifest Creation finished successfully")
-
-
-def _execute_dash_manifest_generation(dash_manifest):
-    """
-    Starts the DASH manifest generation job and polls for completion.
-
-    :param dash_manifest: The DashManifest object that needs to be generated.
-    """
-    bitmovin_api.encoding.manifests.dash.start(manifest_id=dash_manifest.id)
-
-    task = _wait_for_dash_manifest_to_finish(manifest_id=dash_manifest.id)
-
-    while task.status is not Status.FINISHED and task.status is not Status.ERROR:
-        task = _wait_for_dash_manifest_to_finish(manifest_id=dash_manifest.id)
-    if task.status is Status.ERROR:
-        _log_task_errors(task=task)
-        raise Exception("DASH Manifest Creation failed")
-
-    print("DASH Manifest Creation finished successfully")
-
-
-def _wait_for_encoding_to_finish(encoding_id):
-    """
-    Poll the encoding status every 5 seconds until
-    it either finishes or encounters an error.
-
-    :param encoding_id: The ID of the encoding to poll.
-    :return: The final task status of the encoding.
-    """
-    time.sleep(5)
-    task = bitmovin_api.encoding.encodings.status(encoding_id=encoding_id)
-    print(f"Encoding status is {task.status} (progress: {task.progress} %)")
-    return task
-
-
-def _wait_for_hls_manifest_to_finish(manifest_id):
-    """
-    Poll the HLS manifest creation status every 5 seconds
-    until it either finishes or encounters an error.
-
-    :param manifest_id: The ID of the HLS manifest to poll.
-    :return: The final task status of the HLS manifest creation process.
-    """
-    time.sleep(5)
-    task = bitmovin_api.encoding.manifests.hls.status(manifest_id=manifest_id)
-    print(f"HLS manifest status is {task.status} (progress: {task.progress} %)")
-    return task
-
-
-def _wait_for_dash_manifest_to_finish(manifest_id):
-    """
-    Poll the DASH manifest creation status every 5 seconds
-    until it either finishes or encounters an error.
-
-    :param manifest_id: The ID of the DASH manifest to poll.
-    :return: The final task status of the DASH manifest creation process.
-    """
-    time.sleep(5)
-    task = bitmovin_api.encoding.manifests.dash.status(manifest_id=manifest_id)
-    print("DASH manifest status is {} (progress: {} %)".format(task.status, task.progress))
-    return task
 
 
 def _remove_output_base_path(text):

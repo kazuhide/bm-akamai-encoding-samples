@@ -32,19 +32,19 @@ INPUT_PATH = '/path/to/your/input/file.mp4'
 LINODE_OBJECT_STORAGE_OUTPUT_ACCESS_KEY = '<INSERT_YOUR_ACCESS_KEY>'
 LINODE_OBJECT_STORAGE_OUTPUT_SECRET_KEY = '<INSERT_YOUR_SECRET_KEY>'
 LINODE_OBJECT_STORAGE_OUTPUT_BUCKET_NAME = '<INSERT_YOUR_BUCKET_NAME>'
-LINODE_OBJECT_STORAGE_OUTPUT_HOST_NAME = '<INSERT_YOUR_INPUT_HOST_NAME>'
+LINODE_OBJECT_STORAGE_OUTPUT_HOST_NAME = '<INSERT_YOUR_OUTPUT_HOST_NAME>'
 
 OUTPUT_BASE_PATH = f'output/{TEST_ITEM}/'
 
 bitmovin_api = BitmovinApi(api_key=API_KEY, tenant_org_id=ORG_ID)
 
 video_encoding_profiles = [
-    dict(height=None, bitrate=None, profile=ProfileH264.HIGH, level=None, mode=StreamMode.PER_TITLE_TEMPLATE)
+    {"height": None, "bitrate": None, "profile": ProfileH264.HIGH, "level": None, "mode": StreamMode.PER_TITLE_TEMPLATE}
 ]
 
 audio_encoding_profiles = [
-    dict(bitrate=128000, rate=48_000),
-    dict(bitrate=64000, rate=44_100)
+    {"bitrate": 128000, "rate": 48_000},
+    {"bitrate": 64000, "rate": 44_100}
 ]
 
 
@@ -184,7 +184,7 @@ def main():
             stream=Stream(
                 codec_config_id=aac_codec.id,
                 input_streams=[audio_input_stream],
-                name=f"Stream AAC {audio_profile.get('bitrate')/1000:.0f}kbps",
+                name=f"Stream AAC {audio_profile.get('bitrate') / 1000:.0f}kbps",
                 mode=StreamMode.STANDARD))
 
         # Create Fmp4 muxing output path
@@ -202,7 +202,7 @@ def main():
                 init_segment_name='init.mp4',
                 streams=[MuxingStream(stream_id=aac_stream.id)],
                 outputs=[audio_muxing_output],
-                name=f"Audio FMP4 Muxing {audio_profile.get('bitrate')/1000:.0f}kbps"))
+                name=f"Audio FMP4 Muxing {audio_profile.get('bitrate') / 1000:.0f}kbps"))
 
     # === Start Encoding settings together with HLS Manifest definition ===
     start_encoding_request = StartEncodingRequest(
@@ -406,7 +406,7 @@ def _wait_for_hls_manifest_to_finish(manifest_id):
 def _wait_for_dash_manifest_to_finish(manifest_id):
     time.sleep(5)
     task = bitmovin_api.encoding.manifests.dash.status(manifest_id=manifest_id)
-    print("DASH manifest status is {} (progress: {} %)".format(task.status, task.progress))
+    print(f"DASH manifest status is {task.status} (progress: {task.progress} %)")
     return task
 
 
