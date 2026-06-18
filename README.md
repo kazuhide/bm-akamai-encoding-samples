@@ -22,7 +22,8 @@
 
 ### システム条件
 
-- Python 3.8 以降（本リポジトリは Python 3.13 で動作確認しています）
+- 各サンプルスクリプトの実行には Python 3.6 以降（f-string を使用）が必要です。
+- 依存管理に `uv` を利用する場合は Python 3.13 を前提とします（`pyproject.toml` / `.python-version`）。
 
 ### セットアップ
 
