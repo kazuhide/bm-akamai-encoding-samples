@@ -10,7 +10,7 @@ Bitmovin Encoder API を用いて、**冗長 RTMP インジェスト（main + ba
 
 ## 特記事項
 
-- 入力は `RedundantRtmpInput` で作成し、`ingest_points` に主系（`application_name='live'` / `stream_key='primary'`）と予備系（`application_name='live-backup'` / `stream_key='backup'`）の 2 つの `RtmpIngestPoint` を指定します。`delay_threshold`（ミリ秒）で切り替えのしきい値を設定します。
+- 入力は `RedundantRtmpInput` で作成し、`ingest_points` に主系（`application_name='live'` / `stream_key='primary'`）と予備系（`application_name='live-backup'` / `stream_key='backup'`）の 2 つの `RtmpIngestPoint` を指定します。`delay_threshold`（秒）で切り替えのしきい値（主系の無信号がこの秒数続くと予備系へ切り替え）を設定します。
 - ストリームキーは各インジェストポイント側で定義するため、`StartLiveEncodingRequest` の `stream_key` は `"notused"` を指定します。
 - ライブ起動後、主系・予備系それぞれの RTMP URL（`rtmp://<encoder_ip>/<application_name>/<stream_key>`）を表示します。コントリビューション側のエンコーダーから、両系へ同一ソースを送出してください。
 - 主系・予備系のインジェストは Bitmovin の標準機能として追加費用なしで利用できます。
