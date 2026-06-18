@@ -1,0 +1,509 @@
+from time import sleep
+
+from bitmovin_api_sdk import BitmovinApi, BitmovinError
+from bitmovin_api_sdk import S3AccessStyle, S3SignatureVersion, GenericS3Output
+from bitmovin_api_sdk import Encoding, CloudRegion
+from bitmovin_api_sdk import EncodingOutput, AclEntry, AclPermission
+from bitmovin_api_sdk import PresetConfiguration
+from bitmovin_api_sdk import Stream, StreamInput, MuxingStream, StreamMode, ColorConfig
+from bitmovin_api_sdk import AacAudioConfiguration, AacChannelLayout
+from bitmovin_api_sdk import H264VideoConfiguration, CodecConfigType, ProfileH264, LevelH264, WeightedPredictionPFrames
+from bitmovin_api_sdk import Fmp4Muxing
+from bitmovin_api_sdk import HlsManifest, HlsVersion, AudioMediaInfo, StreamInfo
+from bitmovin_api_sdk import DashManifest, Period, VideoAdaptationSet, AudioAdaptationSet
+from bitmovin_api_sdk import DashFmp4Representation, DashRepresentationType, DashRepresentationTypeMode
+from bitmovin_api_sdk import MessageType, StartLiveEncodingRequest, ManifestGenerator
+from bitmovin_api_sdk import LiveHlsManifest, LiveDashManifest, AvailabilityStartTimeMode
+from bitmovin_api_sdk import RedundantRtmpInput, RtmpIngestPoint
+from bitmovin_api_sdk import Status
+
+TEST_ITEM = "live-rtmp-redundant-ingest-h264-vbr-aac-fmp4-hls-dash"
+
+API_KEY = '<INSERT YOUR API KEY>'
+ORG_ID = '<INSERT YOUR ORG ID>'
+
+LINODE_OBJECT_STORAGE_OUTPUT_ACCESS_KEY = '<INSERT_YOUR_ACCESS_KEY>'
+LINODE_OBJECT_STORAGE_OUTPUT_SECRET_KEY = '<INSERT_YOUR_SECRET_KEY>'
+LINODE_OBJECT_STORAGE_OUTPUT_BUCKET_NAME = '<INSERT_YOUR_BUCKET_NAME>'
+LINODE_OBJECT_STORAGE_OUTPUT_HOST_NAME = '<INSERT_YOUR_OUTPUT_HOST_NAME>'
+
+OUTPUT_BASE_PATH = f'output/{TEST_ITEM}/'
+
+bitmovin_api = BitmovinApi(api_key=API_KEY, tenant_org_id=ORG_ID)
+
+# Example H.264 encoding profiles, including different resolutions, bitrates, and profiles.
+video_encoding_profiles = [
+    {"height": 240, "bitrate": 300000, "profile": ProfileH264.HIGH, "level": None, "mode": StreamMode.STANDARD},
+    {"height": 360, "bitrate": 800000, "profile": ProfileH264.HIGH, "level": None, "mode": StreamMode.STANDARD},
+    {"height": 480, "bitrate": 1200000, "profile": ProfileH264.HIGH, "level": None, "mode": StreamMode.STANDARD},
+    {"height": 540, "bitrate": 2000000, "profile": ProfileH264.HIGH, "level": None, "mode": StreamMode.STANDARD},
+    {"height": 720, "bitrate": 4000000, "profile": ProfileH264.HIGH, "level": None, "mode": StreamMode.STANDARD},
+    {"height": 1080, "bitrate": 6000000, "profile": ProfileH264.HIGH, "level": LevelH264.L4, "mode": StreamMode.STANDARD}
+]
+
+# Example AAC audio encoding profiles, each with a specified bitrate and sample rate.
+audio_encoding_profiles = [
+    {"bitrate": 128000, "rate": 48_000},
+    {"bitrate": 64000, "rate": 44_100}
+]
+
+
+def main():
+
+    # === Input and Output definition ===
+    # Create a Redundant RTMP input that exposes two ingest points (main + backup).
+    # 冗長化された RTMP 入力を作成し、メイン/バックアップの 2 つの取り込みポイントを定義する。
+    # If the main ingest stalls beyond delay_threshold seconds, the encoder fails over to the backup.
+    redundant_rtmp_input = bitmovin_api.encoding.inputs.redundant_rtmp.create(
+        redundant_rtmp_input=RedundantRtmpInput(
+            name='Test Redundant RTMP Input',
+            delay_threshold=10,
+            ingest_points=[
+                RtmpIngestPoint(application_name='live', stream_key='primary'),
+                RtmpIngestPoint(application_name='live-backup', stream_key='backup'),
+            ]
+        )
+    )
+    output = bitmovin_api.encoding.outputs.generic_s3.create(
+        generic_s3_output=GenericS3Output(
+            access_key=LINODE_OBJECT_STORAGE_OUTPUT_ACCESS_KEY,
+            secret_key=LINODE_OBJECT_STORAGE_OUTPUT_SECRET_KEY,
+            bucket_name=LINODE_OBJECT_STORAGE_OUTPUT_BUCKET_NAME,
+            host=LINODE_OBJECT_STORAGE_OUTPUT_HOST_NAME,
+            access_style=S3AccessStyle.VIRTUAL_HOSTED,
+            ssl=True,
+            port=443,
+            signature_version=S3SignatureVersion.V4,
+            name='Test Linode Object Storage Output'))
+
+    # === Encoding instance definition ===
+    encoding = bitmovin_api.encoding.encodings.create(
+        encoding=Encoding(
+            name="[{}] {}".format(TEST_ITEM, "Test"),
+            cloud_region=CloudRegion.AKAMAI_JP_OSA,
+            encoder_version='STABLE'
+        )
+    )
+
+    # === Video Profile definition ===
+    for video_profile in video_encoding_profiles:
+        """
+        Loop through each defined H.264 profile.
+        Create a color configuration that automatically copies color flags from the source.
+        If the profile is HIGH, we enable certain advanced features like CABAC.
+        If MAIN or BASELINE were used, you could set different values here.
+        """
+        color_config = ColorConfig(
+            copy_color_primaries_flag=True,
+            copy_color_transfer_flag=True,
+            copy_color_space_flag=True
+        )
+
+        if video_profile.get("profile") == ProfileH264.HIGH:
+            adaptive_spatial_transform = True
+            use_cabac = True
+            num_refframe = 4
+            num_bframe = 3
+            weighted_prediction_p_frames = WeightedPredictionPFrames.SMART
+        elif video_profile.get("profile") == ProfileH264.MAIN:
+            adaptive_spatial_transform = False
+            use_cabac = True
+            num_refframe = 4
+            num_bframe = 3
+            weighted_prediction_p_frames = WeightedPredictionPFrames.SMART
+        elif video_profile.get("profile") == ProfileH264.BASELINE:
+            adaptive_spatial_transform = False
+            use_cabac = False
+            num_refframe = 4
+            num_bframe = 0
+            weighted_prediction_p_frames = WeightedPredictionPFrames.DISABLED
+        else:
+            raise Exception("Unknown profile. Please specify a valid H.264 profile (HIGH, MAIN, or BASELINE).")
+
+        # Create Video Codec Configuration with advanced H.264 parameters
+        h264_codec = bitmovin_api.encoding.configurations.video.h264.create(
+            h264_video_configuration=H264VideoConfiguration(
+                name='Sample video codec configuration',
+                height=video_profile.get("height"),
+                bitrate=video_profile.get("bitrate"),
+                max_bitrate=int(video_profile.get("bitrate") * 1.2),
+                bufsize=int(video_profile.get("bitrate") * 1.5),
+                profile=video_profile.get("profile"),
+                level=video_profile.get("level"),
+                min_keyframe_interval=2,
+                max_keyframe_interval=2,
+                color_config=color_config,
+                ref_frames=num_refframe,
+                bframes=num_bframe,
+                cabac=use_cabac,
+                adaptive_spatial_transform=adaptive_spatial_transform,
+                weighted_prediction_p_frames=weighted_prediction_p_frames,
+                preset_configuration=PresetConfiguration.LIVE_HIGH_QUALITY
+            )
+        )
+
+        # Create a Stream that uses the above H.264 codec configuration
+        h264_stream = bitmovin_api.encoding.encodings.streams.create(
+            encoding_id=encoding.id,
+            stream=Stream(
+                codec_config_id=h264_codec.id,
+                input_streams=[StreamInput(
+                    input_id=redundant_rtmp_input.id,
+                    input_path="live",
+                    position=0)],
+                name=f"Stream H264 {video_profile.get('height')}p",
+                mode=video_profile.get('mode')
+            )
+        )
+
+        # Define the output path for the final video segments
+        video_muxing_output = EncodingOutput(
+            output_id=output.id,
+            output_path=f"{OUTPUT_BASE_PATH}video/{video_profile.get('height')}p",
+            acl=[AclEntry(permission=AclPermission.PUBLIC_READ)]
+        )
+
+        # Create an FMP4 Muxing for this particular resolution
+        bitmovin_api.encoding.encodings.muxings.fmp4.create(
+            encoding_id=encoding.id,
+            fmp4_muxing=Fmp4Muxing(
+                segment_length=6,
+                segment_naming='segment_%number%.m4s',
+                init_segment_name='init.mp4',
+                streams=[MuxingStream(stream_id=h264_stream.id)],
+                outputs=[video_muxing_output],
+                name=f"Video FMP4 Muxing {video_profile.get('height')}p"
+            )
+        )
+
+    # === Audio Profile definition ===
+    for audio_profile in audio_encoding_profiles:
+        """
+        Loop through each defined AAC audio profile.
+        Create a codec configuration object and then a Stream object for that profile.
+        Finally, create an FMP4 muxing for each variant.
+        """
+
+        # Create Audio Codec Configuration
+        aac_codec = bitmovin_api.encoding.configurations.audio.aac.create(
+            aac_audio_configuration=AacAudioConfiguration(
+                bitrate=audio_profile.get("bitrate"),
+                rate=audio_profile.get("rate"),
+                channel_layout=AacChannelLayout.CL_STEREO
+            )
+        )
+
+        # Create Audio Stream
+        aac_stream = bitmovin_api.encoding.encodings.streams.create(
+            encoding_id=encoding.id,
+            stream=Stream(
+                codec_config_id=aac_codec.id,
+                input_streams=[StreamInput(
+                    input_id=redundant_rtmp_input.id,
+                    input_path="live",
+                    position=1)],
+                name=f"Stream AAC {audio_profile.get('bitrate') / 1000:.0f}kbps",
+                mode=StreamMode.STANDARD
+            )
+        )
+
+        # Define the output path for audio segments
+        audio_muxing_output = EncodingOutput(
+            output_id=output.id,
+            output_path=f"{OUTPUT_BASE_PATH}audio/{audio_profile.get('bitrate')}",
+            acl=[AclEntry(permission=AclPermission.PUBLIC_READ)]
+        )
+
+        # Create Fmp4 muxing
+        bitmovin_api.encoding.encodings.muxings.fmp4.create(
+            encoding_id=encoding.id,
+            fmp4_muxing=Fmp4Muxing(
+                segment_length=6,
+                segment_naming='segment_%number%.m4s',
+                init_segment_name='init.mp4',
+                streams=[MuxingStream(stream_id=aac_stream.id)],
+                outputs=[audio_muxing_output],
+                name=f"Audio FMP4 Muxing {audio_profile.get('bitrate') / 1000:.0f}kbps"
+            )
+        )
+
+    # Define HLS and DASH manifests
+    hls_manifest = _create_hls_manifest(encoding_id=encoding.id, output=output, output_path=OUTPUT_BASE_PATH)
+    dash_manifest = _create_dash_manifest(encoding_id=encoding.id, output=output, output_path=OUTPUT_BASE_PATH)
+
+    live_hls_manifest = LiveHlsManifest(
+        manifest_id=hls_manifest.id,
+        timeshift=120,
+        live_edge_offset=12,
+        insert_program_date_time=True
+    )
+    live_dash_manifest = LiveDashManifest(
+        manifest_id=dash_manifest.id,
+        timeshift=120,
+        live_edge_offset=12,
+        suggested_presentation_delay=0,
+        minimum_update_period=6,
+        availability_start_time_mode=AvailabilityStartTimeMode.ON_FIRST_SEGMENT
+    )
+
+    # === Start Encoding settings (no manifests attached to the start request in this example) ===
+    # stream_key is "notused" here: stream keys are defined per ingest point on the redundant input,
+    # so the start request's stream_key is ignored. ストリームキーは取り込みポイント側で定義済みのため未使用。
+    start_live_encoding_request = StartLiveEncodingRequest(
+        dash_manifests=[live_dash_manifest],
+        hls_manifests=[live_hls_manifest],
+        stream_key="notused",
+        manifest_generator=ManifestGenerator.V2
+    )
+    _execute_live_encoding(encoding=encoding, start_live_encoding_request=start_live_encoding_request)
+    live_encoding = _wait_for_live_encoding_details(encoding=encoding)
+
+    # Print both ingest endpoints (main + backup) for the redundant RTMP input.
+    # 冗長化された RTMP 入力のメイン/バックアップ両方の取り込み先を表示する。
+    print("Live encoding is up and ready for ingest. RTMP ingest endpoints (main + backup):")
+    for ingest_point in redundant_rtmp_input.ingest_points:
+        print(f"  rtmp://{live_encoding.encoder_ip}/{ingest_point.application_name}/{ingest_point.stream_key}")
+
+    input("Press Enter to shutdown the live encoding...")
+
+    print("Shutting down live encoding.")
+    bitmovin_api.encoding.encodings.live.stop(encoding_id=encoding.id)
+    _wait_until_encoding_is_in_state(encoding=encoding, expected_status=Status.FINISHED)
+
+
+def _execute_live_encoding(encoding, start_live_encoding_request):
+    bitmovin_api.encoding.encodings.live.start(
+        encoding_id=encoding.id,
+        start_live_encoding_request=start_live_encoding_request)
+
+    _wait_until_encoding_is_in_state(encoding=encoding, expected_status=Status.RUNNING)
+
+
+def _wait_until_encoding_is_in_state(encoding, expected_status):
+    check_interval_in_seconds = 5
+    max_attempts = 5 * (60 / check_interval_in_seconds)
+    attempt = 0
+
+    while attempt < max_attempts:
+        task = bitmovin_api.encoding.encodings.status(encoding_id=encoding.id)
+        if task.status is expected_status:
+            return
+        if task.status is Status.ERROR:
+            _log_task_errors(task=task)
+            raise Exception("Encoding failed")
+
+        print(f"Encoding status is {task.status}. Waiting for status {expected_status} ({attempt} / {max_attempts})"
+              )
+
+        sleep(check_interval_in_seconds)
+
+        attempt += 1
+
+    raise Exception(f"Encoding did not switch to state {expected_status} within {5} minutes. Aborting."
+                    )
+
+
+def _wait_for_live_encoding_details(encoding):
+    timeout_interval_seconds = 5
+    retries = 0
+    max_retries = (60 / timeout_interval_seconds) * 5
+    while retries < max_retries:
+        try:
+            return bitmovin_api.encoding.encodings.live.get(encoding_id=encoding.id)
+        except BitmovinError:
+            print(f"Failed to fetch live encoding details. Retrying... {retries} / {max_retries}"
+                  )
+            retries += 1
+            sleep(timeout_interval_seconds)
+
+    raise Exception(f"Live encoding details could not be fetched after {5} minutes"
+                    )
+
+
+def _create_hls_manifest(encoding_id, output, output_path):
+    """
+    Create an HLS manifest using the generated FMP4 muxings.
+    Loop through all FMP4 muxings and add audio or video entries to the HLS manifest.
+
+    :param encoding_id: The ID of the encoding whose muxings are being processed.
+    :param output: An output object to specify the target output location.
+    :param output_path: Base output path in the bucket for the manifest and segments.
+    :return: HlsManifest object that was created.
+    """
+    manifest_output = EncodingOutput(
+        output_id=output.id,
+        output_path=output_path,
+        acl=[AclEntry(permission=AclPermission.PUBLIC_READ)]
+    )
+
+    hls_manifest = bitmovin_api.encoding.manifests.hls.create(
+        hls_manifest=HlsManifest(
+            manifest_name='stream.m3u8',
+            outputs=[manifest_output],
+            name='HLS Manifest',
+            hls_master_playlist_version=HlsVersion.HLS_V6,
+            hls_media_playlist_version=HlsVersion.HLS_V6
+        )
+    )
+
+    # Retrieve all FMP4 muxings from the encoding,
+    # then match them to their streams, and add them to the HLS manifest.
+    fmp4_muxings = bitmovin_api.encoding.encodings.muxings.fmp4.list(encoding_id=encoding_id)
+    for muxing in fmp4_muxings.items:
+        stream = bitmovin_api.encoding.encodings.streams.get(
+            encoding_id=encoding_id, stream_id=muxing.streams[0].stream_id)
+
+        # Skip advanced per-title templates if found
+        if 'PER_TITLE_TEMPLATE' in stream.mode.value:
+            continue
+
+        # Identify if the muxing belongs to an AAC (audio) or H.264 (video) stream
+        codec = bitmovin_api.encoding.configurations.type.get(configuration_id=stream.codec_config_id)
+
+        # Build the relative segment path for the manifest
+        segment_path = _remove_output_base_path(muxing.outputs[0].output_path)
+
+        if codec.type == CodecConfigType.AAC:
+            # Build an HLS audio group
+            audio_codec = bitmovin_api.encoding.configurations.audio.aac.get(
+                configuration_id=stream.codec_config_id)
+            bitmovin_api.encoding.manifests.hls.media.audio.create(
+                manifest_id=hls_manifest.id,
+                audio_media_info=AudioMediaInfo(
+                    name='HLS Audio Media',
+                    group_id='audio',
+                    language='en',
+                    segment_path=segment_path,
+                    encoding_id=encoding_id,
+                    stream_id=stream.id,
+                    muxing_id=muxing.id,
+                    uri=f'audio_{audio_codec.bitrate}.m3u8'))
+
+        elif codec.type == CodecConfigType.H264:
+            # Build an HLS video stream
+            video_codec = bitmovin_api.encoding.configurations.video.h264.get(configuration_id=stream.codec_config_id)
+            bitmovin_api.encoding.manifests.hls.streams.create(
+                manifest_id=hls_manifest.id,
+                stream_info=StreamInfo(
+                    audio='audio',
+                    closed_captions='NONE',
+                    segment_path=segment_path,
+                    uri=f'video_{video_codec.bitrate}.m3u8',
+                    encoding_id=encoding_id,
+                    stream_id=stream.id,
+                    muxing_id=muxing.id))
+
+    return hls_manifest
+
+
+def _create_dash_manifest(encoding_id, output, output_path):
+    """
+    Create a DASH manifest by building a Period, adding Video and Audio Adaptation Sets,
+    and appending FMP4 representations for each muxing/stream combination.
+
+    :param encoding_id: The ID of the encoding to associate with this manifest.
+    :param output: An output for the manifest's final location.
+    :param output_path: Base output path in the bucket where the manifest files will be written.
+    :return: DashManifest object that was created.
+    """
+    manifest_output = EncodingOutput(
+        output_id=output.id,
+        output_path=output_path,
+        acl=[AclEntry(permission=AclPermission.PUBLIC_READ)]
+    )
+
+    dash_manifest = bitmovin_api.encoding.manifests.dash.create(
+        dash_manifest=DashManifest(
+            manifest_name='stream.mpd',
+            outputs=[manifest_output],
+            name='DASH Manifest'
+        )
+    )
+
+    # Create a Period for the manifest
+    period = bitmovin_api.encoding.manifests.dash.periods.create(
+        manifest_id=dash_manifest.id,
+        period=Period())
+
+    # Create Adaptation Sets for video and audio
+    video_adaptation_set = bitmovin_api.encoding.manifests.dash.periods.adaptationsets.video.create(
+        video_adaptation_set=VideoAdaptationSet(),
+        manifest_id=dash_manifest.id,
+        period_id=period.id)
+    audio_adaptation_set = bitmovin_api.encoding.manifests.dash.periods.adaptationsets.audio.create(
+        audio_adaptation_set=AudioAdaptationSet(lang='en'),
+        manifest_id=dash_manifest.id,
+        period_id=period.id)
+
+    fmp4_muxings = bitmovin_api.encoding.encodings.muxings.fmp4.list(encoding_id=encoding_id)
+    for muxing in fmp4_muxings.items:
+        stream = bitmovin_api.encoding.encodings.streams.get(
+            encoding_id=encoding_id, stream_id=muxing.streams[0].stream_id)
+
+        # Skip advanced per-title templates if found
+        if 'PER_TITLE_TEMPLATE' in stream.mode.value:
+            continue
+
+        # Identify if the muxing is for an AAC or H.264 stream
+        codec = bitmovin_api.encoding.configurations.type.get(configuration_id=stream.codec_config_id)
+        segment_path = _remove_output_base_path(muxing.outputs[0].output_path)
+
+        if codec.type == CodecConfigType.AAC:
+            # Attach this muxing to the audio adaptation set
+            bitmovin_api.encoding.manifests.dash.periods.adaptationsets.representations.fmp4.create(
+                manifest_id=dash_manifest.id,
+                period_id=period.id,
+                adaptationset_id=audio_adaptation_set.id,
+                dash_fmp4_representation=DashFmp4Representation(
+                    encoding_id=encoding_id,
+                    muxing_id=muxing.id,
+                    type_=DashRepresentationType.TEMPLATE,
+                    mode=DashRepresentationTypeMode.TEMPLATE_REPRESENTATION,
+                    segment_path=segment_path))
+
+        elif codec.type == CodecConfigType.H264:
+            # Attach this muxing to the video adaptation set
+            bitmovin_api.encoding.manifests.dash.periods.adaptationsets.representations.fmp4.create(
+                manifest_id=dash_manifest.id,
+                period_id=period.id,
+                adaptationset_id=video_adaptation_set.id,
+                dash_fmp4_representation=DashFmp4Representation(
+                    encoding_id=encoding_id,
+                    muxing_id=muxing.id,
+                    type_=DashRepresentationType.TEMPLATE,
+                    mode=DashRepresentationTypeMode.TEMPLATE_REPRESENTATION,
+                    segment_path=segment_path))
+
+    return dash_manifest
+
+
+def _remove_output_base_path(text):
+    """
+    Remove the OUTPUT_BASE_PATH prefix from the given path.
+    Used for constructing relative segment paths for HLS/DASH manifests.
+
+    :param text: The full path (e.g., 'output/h264-aac-fmp4-hls-dash/video/720p')
+    :return: Relative path without the OUTPUT_BASE_PATH prefix
+    """
+    if text.startswith(OUTPUT_BASE_PATH):
+        return text[len(OUTPUT_BASE_PATH):]
+    return text
+
+
+def _log_task_errors(task):
+    """
+    Print any error messages in the task's message list to the console.
+
+    :param task: A task object (encoding, manifest, etc.) that may contain error messages.
+    """
+    if task is None:
+        return
+
+    filtered = filter(lambda msg: msg.type is MessageType.ERROR, task.messages)
+
+    for message in filtered:
+        print(message.text)
+
+
+if __name__ == '__main__':
+    main()
