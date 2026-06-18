@@ -17,6 +17,10 @@
 
 - [`live/rtmp`](live/rtmp/) — RTMP インジェスト（H.264、CRF / VBR）
 - [`live/srt`](live/srt/) — SRT インジェスト（H.264 / H.265 / AV1、CRF / VBR）
+- [`live/failover`](live/failover/) — 冗長インジェスト（main + backup RTMP フェイルオーバー）
+- [`live/drm`](live/drm/) — ライブ DRM（CENC CBC、Widevine / PlayReady / FairPlay）
+- [`live/scte35`](live/scte35/) — SCTE-35 アドマーカー（TS / HLS、SSAI 連携）
+- [`live/low-latency`](live/low-latency/) — 低遅延 LL-HLS / LL-DASH（chunked CMAF）
 
 ## 使用方法
 
